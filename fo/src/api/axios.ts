@@ -22,8 +22,7 @@ axiosInstance.interceptors.response.use(
     throw new Error(data?.message ?? '알 수 없는 오류가 발생했습니다.')
   },
   (error) => {
-    console.error('API 에러:', error)
-
+    // 에러는 페이지 레벨에서 처리하므로 여기서는 로깅만 수행 (중복 방지)
     if (error.response) {
       const { data } = error.response
       throw new Error(data?.message ?? '서버 오류가 발생했습니다.')

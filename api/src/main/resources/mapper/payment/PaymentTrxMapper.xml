@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="vibepay.api.repository.PaymentTrxMapper">
+<mapper namespace="vibe.api.repository.PaymentTrxMapper">
 
     <!-- 결제 INSERT -->
-    <insert id="insertPayment" parameterType="vibepay.api.entity.Payment">
+    <insert id="insertPayment" parameterType="vibe.api.entity.Payment">
         INSERT /* PaymentTrxMapper.insertPayment */
           INTO PAYMENT (
                ORDER_NO

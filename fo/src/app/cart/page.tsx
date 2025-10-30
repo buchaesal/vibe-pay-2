@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { getCartListApi, deleteCartApi } from '@/api/cart'
@@ -12,10 +12,13 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCartIds, setSelectedCartIds] = useState<number[]>([])
+  const hasFetchedRef = useRef(false)
 
   // 장바구니 목록 조회
   const fetchCartList = async () => {
-    if (!member) return
+    if (!member || !member.memberNo) {
+      return
+    }
 
     try {
       setLoading(true)
@@ -30,14 +33,19 @@ export default function CartPage() {
   }
 
   useEffect(() => {
+    // React Strict Mode에서 중복 호출 방지
+    if (hasFetchedRef.current) return
+
     if (!isLoggedIn || !member) {
       alert('로그인이 필요합니다.')
       router.push('/')
       return
     }
 
+    hasFetchedRef.current = true
     fetchCartList()
-  }, [isLoggedIn, member, router])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, member])
 
   // 체크박스 토글
   const handleToggleCartItem = (cartId: number) => {

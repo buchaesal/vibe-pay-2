@@ -1,6 +1,6 @@
 spring:
   application:
-    name: vibepay-api
+    name: vibe-api
   datasource:
     url: jdbc:postgresql://localhost:5432/postgres
     username: postgres
@@ -15,7 +15,7 @@ spring:
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
-  type-aliases-package: vibepay.api.entity
+  type-aliases-package: vibe.api.entity
   configuration:
     map-underscore-to-camel-case: true
     jdbc-type-for-null: NULL
@@ -35,7 +35,7 @@ server:
 logging:
   level:
     root: INFO
-    vibepay.api: DEBUG
+    vibe.api: DEBUG
     org.springframework.web: DEBUG
     org.mybatis: DEBUG
   pattern:

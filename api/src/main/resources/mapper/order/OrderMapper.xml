@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="vibepay.api.repository.OrderMapper">
+<mapper namespace="vibe.api.repository.OrderMapper">
 
     <!-- 주문서 데이터 조회 ResultMap -->
-    <resultMap id="OrderFormResultMap" type="vibepay.api.dto.response.OrderFormResponse">
-        <association property="memberInfo" javaType="vibepay.api.dto.response.OrderFormResponse$MemberInfo">
+    <resultMap id="OrderFormResultMap" type="vibe.api.dto.response.OrderFormResponse">
+        <association property="memberInfo" javaType="vibe.api.dto.response.OrderFormResponse$MemberInfo">
             <result property="name" column="NAME"/>
             <result property="phone" column="PHONE"/>
             <result property="email" column="EMAIL"/>
             <result property="points" column="POINTS"/>
         </association>
-        <collection property="cartList" ofType="vibepay.api.dto.response.OrderFormResponse$CartItem">
+        <collection property="cartList" ofType="vibe.api.dto.response.OrderFormResponse$CartItem">
             <result property="cartId" column="CART_ID"/>
             <result property="productNo" column="PRODUCT_NO"/>
             <result property="productName" column="PRODUCT_NAME"/>
@@ -46,12 +46,12 @@
     </select>
 
     <!-- 주문 내역 조회 ResultMap -->
-    <resultMap id="OrderHistoryResultMap" type="vibepay.api.dto.response.OrderHistoryResponse">
+    <resultMap id="OrderHistoryResultMap" type="vibe.api.dto.response.OrderHistoryResponse">
         <result property="orderNo" column="ORDER_NO"/>
         <result property="orderDate" column="ORDER_DATE"/>
         <result property="totalAmount" column="TOTAL_AMOUNT"/>
         <result property="status" column="STATUS"/>
-        <collection property="items" ofType="vibepay.api.dto.response.OrderHistoryResponse$OrderHistoryItem">
+        <collection property="items" ofType="vibe.api.dto.response.OrderHistoryResponse$OrderHistoryItem">
             <result property="orderSeq" column="ORDER_SEQ"/>
             <result property="productNo" column="PRODUCT_NO"/>
             <result property="productName" column="PRODUCT_NAME"/>
@@ -87,17 +87,17 @@
     </select>
 
     <!-- 주문 완료 조회 ResultMap -->
-    <resultMap id="OrderCompleteResultMap" type="vibepay.api.dto.response.OrderCompleteResponse">
+    <resultMap id="OrderCompleteResultMap" type="vibe.api.dto.response.OrderCompleteResponse">
         <result property="orderNo" column="ORDER_NO"/>
         <result property="orderDate" column="ORDER_DATE"/>
         <result property="totalAmount" column="TOTAL_AMOUNT"/>
         <result property="paymentStatus" column="PAYMENT_STATUS"/>
-        <collection property="items" ofType="vibepay.api.dto.response.OrderCompleteResponse$OrderCompleteItem">
+        <collection property="items" ofType="vibe.api.dto.response.OrderCompleteResponse$OrderCompleteItem">
             <result property="productName" column="PRODUCT_NAME"/>
             <result property="price" column="PRICE"/>
             <result property="qty" column="QTY"/>
         </collection>
-        <collection property="payments" ofType="vibepay.api.dto.response.OrderCompleteResponse$PaymentInfo">
+        <collection property="payments" ofType="vibe.api.dto.response.OrderCompleteResponse$PaymentInfo">
             <result property="method" column="PAYMENT_METHOD"/>
             <result property="amount" column="PAYMENT_AMOUNT"/>
         </collection>
@@ -126,15 +126,15 @@
     </select>
 
     <!-- 주문 상세 조회 ResultMap -->
-    <resultMap id="OrderDetailResultMap" type="vibepay.api.dto.response.OrderDetailResponse">
+    <resultMap id="OrderDetailResultMap" type="vibe.api.dto.response.OrderDetailResponse">
         <result property="orderNo" column="ORDER_NO"/>
         <result property="orderDate" column="ORDER_DATE"/>
-        <association property="orderer" javaType="vibepay.api.dto.response.OrderDetailResponse$OrdererInfo">
+        <association property="orderer" javaType="vibe.api.dto.response.OrderDetailResponse$OrdererInfo">
             <result property="name" column="ORDERER_NAME"/>
             <result property="phone" column="ORDERER_PHONE"/>
             <result property="email" column="ORDERER_EMAIL"/>
         </association>
-        <collection property="items" ofType="vibepay.api.dto.response.OrderDetailResponse$OrderDetailItem">
+        <collection property="items" ofType="vibe.api.dto.response.OrderDetailResponse$OrderDetailItem">
             <result property="orderSeq" column="ORDER_SEQ"/>
             <result property="productNo" column="PRODUCT_NO"/>
             <result property="productName" column="PRODUCT_NAME"/>
@@ -142,7 +142,7 @@
             <result property="qty" column="QTY"/>
             <result property="cancelQty" column="CANCEL_QTY"/>
         </collection>
-        <collection property="payments" ofType="vibepay.api.dto.response.OrderDetailResponse$PaymentInfo">
+        <collection property="payments" ofType="vibe.api.dto.response.OrderDetailResponse$PaymentInfo">
             <result property="method" column="PAYMENT_METHOD"/>
             <result property="amount" column="PAYMENT_AMOUNT"/>
         </collection>

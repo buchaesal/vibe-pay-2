@@ -6,15 +6,35 @@ interface AuthState {
   isLoggedIn: boolean
   login: (member: Member) => void
   logout: () => void
+  initialize: () => void
+}
+
+// localStorage에서 초기 상태 복원
+const getInitialState = () => {
+  if (typeof window === 'undefined') {
+    return { member: null, isLoggedIn: false }
+  }
+
+  try {
+    const savedMember = localStorage.getItem('member')
+    if (savedMember) {
+      const member = JSON.parse(savedMember) as Member
+      return { member, isLoggedIn: true }
+    }
+  } catch (error) {
+    console.error('localStorage에서 회원 정보 복원 실패:', error)
+  }
+
+  return { member: null, isLoggedIn: false }
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  member: null,
-  isLoggedIn: false,
+  ...getInitialState(),
 
   login: (member: Member) => {
-    // localStorage에 memberNo 저장
+    // localStorage에 Member 전체 객체 저장
     if (typeof window !== 'undefined') {
+      localStorage.setItem('member', JSON.stringify(member))
       localStorage.setItem('memberNo', member.memberNo)
     }
 
@@ -22,11 +42,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
-    // localStorage에서 memberNo 제거
+    // localStorage에서 회원 정보 제거
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('member')
       localStorage.removeItem('memberNo')
     }
 
     set({ member: null, isLoggedIn: false })
+  },
+
+  initialize: () => {
+    set(getInitialState())
   },
 }))

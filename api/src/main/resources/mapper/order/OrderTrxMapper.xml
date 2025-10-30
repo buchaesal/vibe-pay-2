@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="vibepay.api.repository.OrderTrxMapper">
+<mapper namespace="vibe.api.repository.OrderTrxMapper">
 
     <!-- 주문 기본 INSERT -->
-    <insert id="insertOrderBase" parameterType="vibepay.api.entity.OrderBase">
+    <insert id="insertOrderBase" parameterType="vibe.api.entity.OrderBase">
         INSERT /* OrderTrxMapper.insertOrderBase */
           INTO ORDER_BASE (
                ORDER_NO
@@ -27,7 +27,7 @@
     </insert>
 
     <!-- 주문 상품 INSERT -->
-    <insert id="insertOrderProduct" parameterType="vibepay.api.entity.OrderProduct">
+    <insert id="insertOrderProduct" parameterType="vibe.api.entity.OrderProduct">
         INSERT /* OrderTrxMapper.insertOrderProduct */
           INTO ORDER_PRODUCT (
                ORDER_NO
@@ -46,7 +46,7 @@
     </insert>
 
     <!-- 주문 상세 INSERT -->
-    <insert id="insertOrderDetail" parameterType="vibepay.api.entity.OrderDetail">
+    <insert id="insertOrderDetail" parameterType="vibe.api.entity.OrderDetail">
         INSERT /* OrderTrxMapper.insertOrderDetail */
           INTO ORDER_DETAIL (
                ORDER_NO
