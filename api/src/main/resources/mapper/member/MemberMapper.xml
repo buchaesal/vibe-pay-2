@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="vibepay.api.repository.MemberMapper">
+
+    <!-- 로그인 ID로 회원 조회 -->
+    <select id="selectMemberByLoginId" parameterType="string" resultType="vibepay.api.entity.Member">
+        SELECT /* MemberMapper.selectMemberByLoginId */
+               MEMBER_NO
+             , LOGIN_ID
+             , NAME
+             , PASSWORD
+             , EMAIL
+             , PHONE
+             , POINTS
+             , CREATED_AT
+             , UPDATED_AT
+          FROM MEMBER
+         WHERE LOGIN_ID = #{loginId}
+    </select>
+
+    <!-- 회원번호로 회원 조회 -->
+    <select id="selectMemberByMemberNo" parameterType="string" resultType="vibepay.api.entity.Member">
+        SELECT /* MemberMapper.selectMemberByMemberNo */
+               MEMBER_NO
+             , LOGIN_ID
+             , NAME
+             , EMAIL
+             , PHONE
+             , POINTS
+             , CREATED_AT
+             , UPDATED_AT
+          FROM MEMBER
+         WHERE MEMBER_NO = #{memberNo}
+    </select>
+
+    <!-- 로그인 ID 중복 확인 -->
+    <select id="countByLoginId" parameterType="string" resultType="int">
+        SELECT /* MemberMapper.countByLoginId */
+               COUNT(*)
+          FROM MEMBER
+         WHERE LOGIN_ID = #{loginId}
+    </select>
+
+    <!-- 회원번호 채번 -->
+    <select id="selectNextMemberNo" resultType="string">
+        SELECT /* MemberMapper.selectNextMemberNo */
+               'M' || LPAD(NEXTVAL('SEQ_MEMBER_NO')::TEXT, 6, '0')
+    </select>
+
+</mapper>

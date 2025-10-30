@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="vibepay.api.repository.OrderMapper">
+
+    <!-- 주문서 데이터 조회 ResultMap -->
+    <resultMap id="OrderFormResultMap" type="vibepay.api.dto.response.OrderFormResponse">
+        <association property="memberInfo" javaType="vibepay.api.dto.response.OrderFormResponse$MemberInfo">
+            <result property="name" column="NAME"/>
+            <result property="phone" column="PHONE"/>
+            <result property="email" column="EMAIL"/>
+            <result property="points" column="POINTS"/>
+        </association>
+        <collection property="cartList" ofType="vibepay.api.dto.response.OrderFormResponse$CartItem">
+            <result property="cartId" column="CART_ID"/>
+            <result property="productNo" column="PRODUCT_NO"/>
+            <result property="productName" column="PRODUCT_NAME"/>
+            <result property="qty" column="QTY"/>
+            <result property="price" column="PRICE"/>
+        </collection>
+    </resultMap>
+
+    <!-- 주문서 데이터 조회 -->
+    <select id="selectOrderFormData" parameterType="string" resultMap="OrderFormResultMap">
+        SELECT /* OrderMapper.selectOrderFormData */
+               M.NAME
+             , M.PHONE
+             , M.EMAIL
+             , M.POINTS
+             , C.CART_ID
+             , C.PRODUCT_NO
+             , P.PRODUCT_NAME
+             , C.QTY
+             , P.PRICE
+          FROM MEMBER M
+          LEFT JOIN CART C ON M.MEMBER_NO = C.MEMBER_NO
+          LEFT JOIN PRODUCT P ON C.PRODUCT_NO = P.PRODUCT_NO
+         WHERE M.MEMBER_NO = #{memberNo}
+         ORDER BY C.CREATED_AT DESC
+    </select>
+
+    <!-- 주문번호 채번 -->
+    <select id="selectNextOrderNo" resultType="string">
+        SELECT /* OrderMapper.selectNextOrderNo */
+               'O' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || LPAD(NEXTVAL('SEQ_ORDER_NO')::TEXT, 6, '0')
+    </select>
+
+    <!-- 주문 내역 조회 ResultMap -->
+    <resultMap id="OrderHistoryResultMap" type="vibepay.api.dto.response.OrderHistoryResponse">
+        <result property="orderNo" column="ORDER_NO"/>
+        <result property="orderDate" column="ORDER_DATE"/>
+        <result property="totalAmount" column="TOTAL_AMOUNT"/>
+        <result property="status" column="STATUS"/>
+        <collection property="items" ofType="vibepay.api.dto.response.OrderHistoryResponse$OrderHistoryItem">
+            <result property="orderSeq" column="ORDER_SEQ"/>
+            <result property="productNo" column="PRODUCT_NO"/>
+            <result property="productName" column="PRODUCT_NAME"/>
+            <result property="price" column="PRICE"/>
+            <result property="qty" column="QTY"/>
+            <result property="cancelQty" column="CANCEL_QTY"/>
+        </collection>
+    </resultMap>
+
+    <!-- 주문 내역 조회 -->
+    <select id="selectOrderHistoryList" parameterType="string" resultMap="OrderHistoryResultMap">
+        SELECT /* OrderMapper.selectOrderHistoryList */
+               OB.ORDER_NO
+             , TO_CHAR(OB.ORDER_DATETIME, 'YYYY-MM-DD') AS ORDER_DATE
+             , COALESCE(SUM(OP.PRICE * OD.ORDER_QTY), 0) AS TOTAL_AMOUNT
+             , CASE
+                   WHEN SUM(OD.ORDER_QTY) = SUM(OD.CANCEL_QTY) THEN 'CANCEL'
+                   ELSE 'COMPLETE'
+               END AS STATUS
+             , OD.ORDER_SEQ
+             , OD.PRODUCT_NO
+             , OP.PRODUCT_NAME
+             , OP.PRICE
+             , OD.ORDER_QTY AS QTY
+             , OD.CANCEL_QTY
+          FROM ORDER_BASE OB
+         INNER JOIN ORDER_DETAIL OD ON OB.ORDER_NO = OD.ORDER_NO
+         INNER JOIN ORDER_PRODUCT OP ON OB.ORDER_NO = OP.ORDER_NO AND OD.PRODUCT_NO = OP.PRODUCT_NO
+         WHERE OB.MEMBER_NO = #{memberNo}
+           AND OD.ORDER_TYPE = 'ORDER'
+         GROUP BY OB.ORDER_NO, OB.ORDER_DATETIME, OD.ORDER_SEQ, OD.PRODUCT_NO, OP.PRODUCT_NAME, OP.PRICE, OD.ORDER_QTY, OD.CANCEL_QTY
+         ORDER BY OB.ORDER_DATETIME DESC, OD.ORDER_SEQ ASC
+    </select>
+
+    <!-- 주문 완료 조회 ResultMap -->
+    <resultMap id="OrderCompleteResultMap" type="vibepay.api.dto.response.OrderCompleteResponse">
+        <result property="orderNo" column="ORDER_NO"/>
+        <result property="orderDate" column="ORDER_DATE"/>
+        <result property="totalAmount" column="TOTAL_AMOUNT"/>
+        <result property="paymentStatus" column="PAYMENT_STATUS"/>
+        <collection property="items" ofType="vibepay.api.dto.response.OrderCompleteResponse$OrderCompleteItem">
+            <result property="productName" column="PRODUCT_NAME"/>
+            <result property="price" column="PRICE"/>
+            <result property="qty" column="QTY"/>
+        </collection>
+        <collection property="payments" ofType="vibepay.api.dto.response.OrderCompleteResponse$PaymentInfo">
+            <result property="method" column="PAYMENT_METHOD"/>
+            <result property="amount" column="PAYMENT_AMOUNT"/>
+        </collection>
+    </resultMap>
+
+    <!-- 주문 완료 조회 -->
+    <select id="selectOrderCompleteData" parameterType="string" resultMap="OrderCompleteResultMap">
+        SELECT /* OrderMapper.selectOrderCompleteData */
+               OB.ORDER_NO
+             , TO_CHAR(OB.ORDER_DATETIME, 'YYYY-MM-DD HH24:MI') AS ORDER_DATE
+             , COALESCE(SUM(OP.PRICE * OD.ORDER_QTY), 0) AS TOTAL_AMOUNT
+             , 'SUCCESS' AS PAYMENT_STATUS
+             , OP.PRODUCT_NAME
+             , OP.PRICE
+             , OD.ORDER_QTY AS QTY
+             , P.PAYMENT_METHOD
+             , P.PAYMENT_AMOUNT
+          FROM ORDER_BASE OB
+         INNER JOIN ORDER_DETAIL OD ON OB.ORDER_NO = OD.ORDER_NO
+         INNER JOIN ORDER_PRODUCT OP ON OB.ORDER_NO = OP.ORDER_NO AND OD.PRODUCT_NO = OP.PRODUCT_NO
+          LEFT JOIN PAYMENT P ON OB.ORDER_NO = P.ORDER_NO AND P.PAYMENT_TYPE = 'PAYMENT'
+         WHERE OB.ORDER_NO = #{orderNo}
+           AND OD.ORDER_TYPE = 'ORDER'
+         GROUP BY OB.ORDER_NO, OB.ORDER_DATETIME, OP.PRODUCT_NAME, OP.PRICE, OD.ORDER_QTY, P.PAYMENT_METHOD, P.PAYMENT_AMOUNT
+         ORDER BY OD.ORDER_SEQ ASC
+    </select>
+
+    <!-- 주문 상세 조회 ResultMap -->
+    <resultMap id="OrderDetailResultMap" type="vibepay.api.dto.response.OrderDetailResponse">
+        <result property="orderNo" column="ORDER_NO"/>
+        <result property="orderDate" column="ORDER_DATE"/>
+        <association property="orderer" javaType="vibepay.api.dto.response.OrderDetailResponse$OrdererInfo">
+            <result property="name" column="ORDERER_NAME"/>
+            <result property="phone" column="ORDERER_PHONE"/>
+            <result property="email" column="ORDERER_EMAIL"/>
+        </association>
+        <collection property="items" ofType="vibepay.api.dto.response.OrderDetailResponse$OrderDetailItem">
+            <result property="orderSeq" column="ORDER_SEQ"/>
+            <result property="productNo" column="PRODUCT_NO"/>
+            <result property="productName" column="PRODUCT_NAME"/>
+            <result property="price" column="PRICE"/>
+            <result property="qty" column="QTY"/>
+            <result property="cancelQty" column="CANCEL_QTY"/>
+        </collection>
+        <collection property="payments" ofType="vibepay.api.dto.response.OrderDetailResponse$PaymentInfo">
+            <result property="method" column="PAYMENT_METHOD"/>
+            <result property="amount" column="PAYMENT_AMOUNT"/>
+        </collection>
+    </resultMap>
+
+    <!-- 주문 상세 조회 -->
+    <select id="selectOrderDetail" parameterType="string" resultMap="OrderDetailResultMap">
+        SELECT /* OrderMapper.selectOrderDetail */
+               OB.ORDER_NO
+             , TO_CHAR(OB.ORDER_DATETIME, 'YYYY-MM-DD HH24:MI') AS ORDER_DATE
+             , OB.ORDERER_NAME
+             , OB.ORDERER_PHONE
+             , OB.ORDERER_EMAIL
+             , OD.ORDER_SEQ
+             , OD.PRODUCT_NO
+             , OP.PRODUCT_NAME
+             , OP.PRICE
+             , OD.ORDER_QTY AS QTY
+             , OD.CANCEL_QTY
+             , P.PAYMENT_METHOD
+             , P.PAYMENT_AMOUNT
+          FROM ORDER_BASE OB
+         INNER JOIN ORDER_DETAIL OD ON OB.ORDER_NO = OD.ORDER_NO
+         INNER JOIN ORDER_PRODUCT OP ON OB.ORDER_NO = OP.ORDER_NO AND OD.PRODUCT_NO = OP.PRODUCT_NO
+          LEFT JOIN PAYMENT P ON OB.ORDER_NO = P.ORDER_NO AND P.PAYMENT_TYPE = 'PAYMENT'
+         WHERE OB.ORDER_NO = #{orderNo}
+           AND OD.ORDER_TYPE = 'ORDER'
+         ORDER BY OD.ORDER_SEQ ASC
+    </select>
+
+    <!-- 클레임번호 채번 -->
+    <select id="selectNextClaimNo" resultType="string">
+        SELECT /* OrderMapper.selectNextClaimNo */
+               'C' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || LPAD(NEXTVAL('SEQ_CLAIM_NO')::TEXT, 6, '0')
+    </select>
+
+</mapper>

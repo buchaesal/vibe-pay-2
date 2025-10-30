@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="vibepay.api.repository.OrderTrxMapper">
+
+    <!-- 주문 기본 INSERT -->
+    <insert id="insertOrderBase" parameterType="vibepay.api.entity.OrderBase">
+        INSERT /* OrderTrxMapper.insertOrderBase */
+          INTO ORDER_BASE (
+               ORDER_NO
+             , MEMBER_NO
+             , ORDER_DATETIME
+             , ORDERER_NAME
+             , ORDERER_PHONE
+             , ORDERER_EMAIL
+             , CREATED_AT
+        )
+        VALUES (
+               #{orderNo}
+             , #{memberNo}
+             , #{orderDatetime}
+             , #{ordererName}
+             , #{ordererPhone}
+             , #{ordererEmail}
+             , NOW()
+        )
+    </insert>
+
+    <!-- 주문 상품 INSERT -->
+    <insert id="insertOrderProduct" parameterType="vibepay.api.entity.OrderProduct">
+        INSERT /* OrderTrxMapper.insertOrderProduct */
+          INTO ORDER_PRODUCT (
+               ORDER_NO
+             , PRODUCT_NO
+             , PRODUCT_NAME
+             , PRICE
+             , CREATED_AT
+        )
+        VALUES (
+               #{orderNo}
+             , #{productNo}
+             , #{productName}
+             , #{price}
+             , NOW()
+        )
+    </insert>
+
+    <!-- 주문 상세 INSERT -->
+    <insert id="insertOrderDetail" parameterType="vibepay.api.entity.OrderDetail">
+        INSERT /* OrderTrxMapper.insertOrderDetail */
+          INTO ORDER_DETAIL (
+               ORDER_NO
+             , ORDER_SEQ
+             , PROCESS_SEQ
+             , PARENT_PROCESS_SEQ
+             , CLAIM_NO
+             , PRODUCT_NO
+             , ORDER_TYPE
+             , ORDER_DATETIME
+             , COMPLETE_DATETIME
+             , ORDER_QTY
+             , CANCEL_QTY
+             , CREATED_AT
+        )
+        VALUES (
+               #{orderNo}
+             , #{orderSeq}
+             , #{processSeq}
+             , #{parentProcessSeq}
+             , #{claimNo}
+             , #{productNo}
+             , #{orderType}
+             , #{orderDatetime}
+             , #{completeDatetime}
+             , #{orderQty}
+             , #{cancelQty}
+             , NOW()
+        )
+    </insert>
+
+    <!-- 주문 상세 완료일시 업데이트 -->
+    <update id="updateOrderDetailComplete" parameterType="string">
+        UPDATE /* OrderTrxMapper.updateOrderDetailComplete */
+               ORDER_DETAIL
+           SET COMPLETE_DATETIME = NOW()
+             , UPDATED_AT = NOW()
+         WHERE ORDER_NO = #{orderNo}
+           AND ORDER_TYPE = 'ORDER'
+           AND COMPLETE_DATETIME IS NULL
+    </update>
+
+    <!-- 주문 상세 취소수량 누적 업데이트 -->
+    <update id="updateOrderDetailCancelQty">
+        UPDATE /* OrderTrxMapper.updateOrderDetailCancelQty */
+               ORDER_DETAIL
+           SET CANCEL_QTY = CANCEL_QTY + #{cancelQty}
+             , UPDATED_AT = NOW()
+         WHERE ORDER_NO = #{orderNo}
+           AND ORDER_SEQ = #{orderSeq}
+           AND ORDER_TYPE = 'ORDER'
+    </update>
+
+</mapper>

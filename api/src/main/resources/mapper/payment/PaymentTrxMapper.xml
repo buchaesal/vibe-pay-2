@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="vibepay.api.repository.PaymentTrxMapper">
+
+    <!-- 결제 INSERT -->
+    <insert id="insertPayment" parameterType="vibepay.api.entity.Payment">
+        INSERT /* PaymentTrxMapper.insertPayment */
+          INTO PAYMENT (
+               ORDER_NO
+             , PAYMENT_TYPE
+             , PG_TYPE
+             , PAYMENT_METHOD
+             , PAYMENT_AMOUNT
+             , CLAIM_NO
+             , REMAIN_REFUNDABLE_AMOUNT
+             , PAYMENT_DATETIME
+             , APPROVAL_NO
+             , TID
+             , CREATED_AT
+        )
+        VALUES (
+               #{orderNo}
+             , #{paymentType}
+             , #{pgType}
+             , #{paymentMethod}
+             , #{paymentAmount}
+             , #{claimNo}
+             , #{remainRefundableAmount}
+             , #{paymentDatetime}
+             , #{approvalNo}
+             , #{tid}
+             , NOW()
+        )
+    </insert>
+
+    <!-- 환불가능금액 업데이트 -->
+    <update id="updateRemainRefundableAmount">
+        UPDATE /* PaymentTrxMapper.updateRemainRefundableAmount */
+               PAYMENT
+           SET REMAIN_REFUNDABLE_AMOUNT = #{remainAmount}
+             , UPDATED_AT = NOW()
+         WHERE PAYMENT_NO = #{paymentNo}
+    </update>
+
+</mapper>

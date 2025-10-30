@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="vibepay.api.repository.PaymentInterfaceTrxMapper">
+
+    <!-- 결제 인터페이스 로그 INSERT -->
+    <insert id="insertPaymentInterface" parameterType="vibepay.api.entity.PaymentInterface">
+        INSERT /* PaymentInterfaceTrxMapper.insertPaymentInterface */
+          INTO PAYMENT_INTERFACE (
+               PG_TYPE
+             , TRANSACTION_TYPE
+             , TRANSACTION_DATETIME
+             , ORDER_NO
+             , PAYMENT_NO
+             , REQUEST_JSON
+             , RESPONSE_JSON
+             , RESULT
+             , CREATED_AT
+        )
+        VALUES (
+               #{pgType}
+             , #{transactionType}
+             , #{transactionDatetime}
+             , #{orderNo}
+             , #{paymentNo}
+             , #{requestJson}
+             , #{responseJson}
+             , #{result}
+             , NOW()
+        )
+    </insert>
+
+</mapper>

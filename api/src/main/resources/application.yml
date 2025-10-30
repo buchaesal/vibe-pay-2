@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: vibepay-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: gksfkqhd12@
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: vibepay.api.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    jdbc-type-for-null: NULL
+    call-setters-on-nulls: true
+    default-fetch-size: 100
+    default-statement-timeout: 30
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+logging:
+  level:
+    root: INFO
+    vibepay.api: DEBUG
+    org.springframework.web: DEBUG
+    org.mybatis: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# PG 설정
+payment:
+  inicis:
+    mid: INIpayTest
+    sign-key: SU5JTElURV9UUklQTEVERVNfS0VZU1RS
+    api-key: ItEQKi3rY7uvDS8l
+    refund-url: https://iniapi.inicis.com/v2/pg/refund
+    partial-refund-url: https://iniapi.inicis.com/v2/pg/partialRefund
+  toss:
+    client-key: test_ck_DpexMgkW36PL5OnYYn7drGbR5ozO
+    secret-key: test_sk_P9BRQmyarY56W4lPgbnNrJ07KzLN
+    payment-url: https://js.tosspayments.com/v1/payment
+    api-base-url: https://api.tosspayments.com/v1
