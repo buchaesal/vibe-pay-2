@@ -52,6 +52,7 @@ public class OrderDetailResponse {
     @Getter
     @Setter
     public static class PaymentInfo {
+        private String pgType;  // INICIS, TOSS, POINT
         private String method;  // CARD, POINT
         private Integer amount;
     }

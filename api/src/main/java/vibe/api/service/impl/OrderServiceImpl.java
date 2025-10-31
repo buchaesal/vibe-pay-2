@@ -110,13 +110,14 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
-        log.info("주문 생성 시작: orderNo={}, memberNo={}", request.getOrderNo(), request.getMemberNo());
+        log.info("주문 생성 시작: orderNo={}, memberNo={}",
+            request.getOrderInfo().getOrderNo(), request.getOrderInfo().getMemberNo());
 
-        String orderNo = request.getOrderNo();
+        String orderNo = request.getOrderInfo().getOrderNo();
         LocalDateTime orderDatetime = LocalDateTime.now();
 
         // 1. 장바구니 조회
-        List<CartResponse> cartItems = cartMapper.selectCartByIds(request.getCartIdList());
+        List<CartResponse> cartItems = cartMapper.selectCartByIds(request.getOrderInfo().getCartIdList());
         if (cartItems == null || cartItems.isEmpty()) {
             throw new ApiException(ErrorCode.CART_NOT_FOUND);
         }
@@ -126,11 +127,11 @@ public class OrderServiceImpl implements OrderService {
         // 2. ORDER_BASE INSERT
         OrderBase orderBase = new OrderBase();
         orderBase.setOrderNo(orderNo);
-        orderBase.setMemberNo(request.getMemberNo());
+        orderBase.setMemberNo(request.getOrderInfo().getMemberNo());
         orderBase.setOrderDatetime(orderDatetime);
-        orderBase.setOrdererName(request.getOrdererName());
-        orderBase.setOrdererPhone(request.getOrdererPhone());
-        orderBase.setOrdererEmail(request.getOrdererEmail());
+        orderBase.setOrdererName(request.getOrderInfo().getOrdererName());
+        orderBase.setOrdererPhone(request.getOrderInfo().getOrdererPhone());
+        orderBase.setOrdererEmail(request.getOrderInfo().getOrdererEmail());
 
         orderTrxMapper.insertOrderBase(orderBase);
         log.debug("ORDER_BASE 생성 완료: orderNo={}", orderNo);
@@ -172,7 +173,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 5. 결제 처리 (전략 패턴 + 망취소)
         try {
-            paymentService.processPayments(orderNo, request.getPayments());
+            paymentService.processPayments(request);
             log.info("결제 처리 완료: orderNo={}", orderNo);
         } catch (Exception e) {
             log.error("결제 처리 실패: orderNo={}", orderNo, e);
@@ -184,8 +185,8 @@ public class OrderServiceImpl implements OrderService {
         log.debug("ORDER_DETAIL 완료일시 업데이트: orderNo={}", orderNo);
 
         // 7. 장바구니 삭제 (별도 트랜잭션으로 분리하지 않고 같은 트랜잭션에서 처리)
-        cartTrxMapper.deleteCartByIds(request.getCartIdList());
-        log.debug("장바구니 삭제 완료: count={}", request.getCartIdList().size());
+        cartTrxMapper.deleteCartByIds(request.getOrderInfo().getCartIdList());
+        log.debug("장바구니 삭제 완료: count={}", request.getOrderInfo().getCartIdList().size());
 
         log.info("주문 생성 완료: orderNo={}", orderNo);
 
@@ -248,55 +249,135 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public void cancelOrder(OrderCancelRequest request) {
-        log.info("주문 취소 시작: orderNo={}, orderSeq={}, cancelQty={}",
-            request.getOrderNo(), request.getOrderSeq(), request.getCancelQty());
+        String orderNo = request.getOrderNo();
+        Boolean isFullCancel = request.getIsFullCancel() != null && request.getIsFullCancel();
+
+        if (isFullCancel) {
+            log.info("전체 주문 취소 시작: orderNo={}", orderNo);
+            processFullCancel(orderNo);
+        } else {
+            log.info("부분 주문 취소 시작: orderNo={}, orderSeq={}, cancelQty={}",
+                orderNo, request.getOrderSeq(), request.getCancelQty());
+            processPartialCancel(request);
+        }
+    }
+
+    /**
+     * 전체 주문 취소 처리
+     */
+    private void processFullCancel(String orderNo) {
+        // 1. 클레임번호 채번
+        String claimNo = orderMapper.selectNextClaimNo();
+
+        // 2. 주문 상세 조회
+        OrderDetailResponse orderDetail = orderMapper.selectOrderDetail(orderNo);
+        if (orderDetail == null || orderDetail.getItems().isEmpty()) {
+            throw new ApiException(ErrorCode.ORDER_NOT_FOUND);
+        }
+
+        // 3. 취소 가능한 상품만 필터링
+        List<OrderDetailResponse.OrderDetailItem> cancellableItems = orderDetail.getItems().stream()
+            .filter(item -> item.getQty() > item.getCancelQty())
+            .toList();
+
+        if (cancellableItems.isEmpty()) {
+            throw new ApiException(ErrorCode.CANCEL_FAIL);
+        }
+
+        // 4. 총 취소 금액 계산
+        Integer totalCancelAmount = 0;
+        int processSeq = orderDetail.getItems().size() + 1;
+
+        // 5. 각 상품별 취소 처리
+        for (OrderDetailResponse.OrderDetailItem item : cancellableItems) {
+            Integer availableQty = item.getQty() - item.getCancelQty();
+            Integer cancelAmount = item.getPrice() * availableQty;
+            totalCancelAmount += cancelAmount;
+
+            // 취소 주문 상세 INSERT
+            OrderDetail cancelDetail = new OrderDetail();
+            cancelDetail.setOrderNo(orderNo);
+            cancelDetail.setOrderSeq(item.getOrderSeq());
+            cancelDetail.setProcessSeq(processSeq++);
+            cancelDetail.setParentProcessSeq(item.getOrderSeq());
+            cancelDetail.setClaimNo(claimNo);
+            cancelDetail.setProductNo(item.getProductNo());
+            cancelDetail.setOrderType("CANCEL");
+            cancelDetail.setOrderDatetime(LocalDateTime.now());
+            cancelDetail.setCompleteDatetime(LocalDateTime.now());
+            cancelDetail.setOrderQty(availableQty);
+            cancelDetail.setCancelQty(0);
+
+            orderTrxMapper.insertOrderDetail(cancelDetail);
+
+            // 원주문의 취소수량 누적 업데이트
+            orderTrxMapper.updateOrderDetailCancelQty(orderNo, item.getOrderSeq(), availableQty);
+
+            log.debug("상품 취소 처리: orderSeq={}, qty={}, amount={}",
+                item.getOrderSeq(), availableQty, cancelAmount);
+        }
+
+        // 6. 결제 취소 처리
+        paymentService.processRefund(orderNo, totalCancelAmount);
+
+        log.info("전체 주문 취소 완료: orderNo={}, claimNo={}, totalAmount={}",
+            orderNo, claimNo, totalCancelAmount);
+    }
+
+    /**
+     * 부분 주문 취소 처리
+     */
+    private void processPartialCancel(OrderCancelRequest request) {
+        String orderNo = request.getOrderNo();
+        Integer orderSeq = request.getOrderSeq();
+        Integer cancelQty = request.getCancelQty();
 
         // 1. 클레임번호 채번
         String claimNo = orderMapper.selectNextClaimNo();
 
         // 2. 주문 상세 조회 (원주문 정보)
-        OrderDetailResponse orderDetail = orderMapper.selectOrderDetail(request.getOrderNo());
+        OrderDetailResponse orderDetail = orderMapper.selectOrderDetail(orderNo);
         if (orderDetail == null || orderDetail.getItems().isEmpty()) {
             throw new ApiException(ErrorCode.ORDER_NOT_FOUND);
         }
 
         // 3. 취소할 상품 찾기
         OrderDetailResponse.OrderDetailItem targetItem = orderDetail.getItems().stream()
-            .filter(item -> item.getOrderSeq().equals(request.getOrderSeq()))
+            .filter(item -> item.getOrderSeq().equals(orderSeq))
             .findFirst()
             .orElseThrow(() -> new ApiException(ErrorCode.ORDER_NOT_FOUND));
 
         // 4. 취소 가능 수량 검증
         Integer availableQty = targetItem.getQty() - targetItem.getCancelQty();
-        if (availableQty < request.getCancelQty()) {
+        if (availableQty < cancelQty) {
             throw new ApiException(ErrorCode.CANCEL_FAIL);
         }
 
         // 5. 취소 금액 계산
-        Integer cancelAmount = targetItem.getPrice() * request.getCancelQty();
+        Integer cancelAmount = targetItem.getPrice() * cancelQty;
 
         // 6. 취소 주문 상세 INSERT
         OrderDetail cancelDetail = new OrderDetail();
-        cancelDetail.setOrderNo(request.getOrderNo());
-        cancelDetail.setOrderSeq(request.getOrderSeq());
+        cancelDetail.setOrderNo(orderNo);
+        cancelDetail.setOrderSeq(orderSeq);
         cancelDetail.setProcessSeq(orderDetail.getItems().size() + 1);  // 새로운 processSeq
-        cancelDetail.setParentProcessSeq(request.getOrderSeq());
+        cancelDetail.setParentProcessSeq(orderSeq);
         cancelDetail.setClaimNo(claimNo);
         cancelDetail.setProductNo(targetItem.getProductNo());
         cancelDetail.setOrderType("CANCEL");
         cancelDetail.setOrderDatetime(LocalDateTime.now());
         cancelDetail.setCompleteDatetime(LocalDateTime.now());
         cancelDetail.setOrderQty(0);
-        cancelDetail.setCancelQty(request.getCancelQty());
+        cancelDetail.setCancelQty(cancelQty);
 
         orderTrxMapper.insertOrderDetail(cancelDetail);
 
         // 7. 원주문의 취소수량 누적 업데이트
-        orderTrxMapper.updateOrderDetailCancelQty(request.getOrderNo(), request.getOrderSeq(), request.getCancelQty());
+        orderTrxMapper.updateOrderDetailCancelQty(orderNo, orderSeq, cancelQty);
 
         // 8. 결제 취소 처리
-        paymentService.processRefund(request.getOrderNo(), cancelAmount);
+        paymentService.processRefund(orderNo, cancelAmount);
 
-        log.info("주문 취소 완료: orderNo={}, claimNo={}", request.getOrderNo(), claimNo);
+        log.info("부분 주문 취소 완료: orderNo={}, claimNo={}", orderNo, claimNo);
     }
 }

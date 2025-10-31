@@ -1,6 +1,7 @@
 package vibe.api.payment.strategy;
 
-import vibe.api.dto.request.CreateOrderRequest;
+import vibe.api.dto.request.OrderInfo;
+import vibe.api.dto.request.PaymentInfo;
 import vibe.api.entity.Payment;
 
 import java.util.Map;
@@ -16,7 +17,7 @@ public interface PaymentStrategy {
     /**
      * 결제 승인
      */
-    Payment approve(String orderNo, CreateOrderRequest.PaymentInfo paymentInfo);
+    Payment approve(OrderInfo orderInfo, PaymentInfo paymentInfo);
 
     /**
      * 망취소
@@ -26,5 +27,5 @@ public interface PaymentStrategy {
     /**
      * 취소 (전체 또는 부분)
      */
-    void refund(String tid, Integer cancelAmount, Integer remainAmount);
+    void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount);
 }

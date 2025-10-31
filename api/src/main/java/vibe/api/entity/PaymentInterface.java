@@ -23,7 +23,7 @@ public class PaymentInterface {
     private Long paymentNo;
     private String requestJson;
     private String responseJson;
-    private String result;  // SUCCESS, FAIL
+    private String resultCode;  // 이니시스: resultCode, 토스: status 또는 code
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

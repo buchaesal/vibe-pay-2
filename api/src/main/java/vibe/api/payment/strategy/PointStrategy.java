@@ -5,11 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import vibe.api.common.enums.ErrorCode;
 import vibe.api.common.exception.ApiException;
-import vibe.api.dto.request.CreateOrderRequest;
+import vibe.api.dto.request.OrderInfo;
+import vibe.api.dto.request.PaymentInfo;
 import vibe.api.entity.Member;
 import vibe.api.entity.Payment;
 import vibe.api.repository.MemberMapper;
 import vibe.api.repository.MemberTrxMapper;
+import vibe.api.repository.OrderMapper;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -28,11 +30,12 @@ public class PointStrategy implements PaymentStrategy {
 
     private final MemberMapper memberMapper;
     private final MemberTrxMapper memberTrxMapper;
+    private final OrderMapper orderMapper;
 
     @Override
-    public Payment approve(String orderNo, CreateOrderRequest.PaymentInfo paymentInfo) {
-        // authResult에서 memberNo 추출 (Frontend에서 전달)
-        String memberNo = (String) paymentInfo.getAuthResult().get("memberNo");
+    public Payment approve(OrderInfo orderInfo, PaymentInfo paymentInfo) {
+        String orderNo = orderInfo.getOrderNo();
+        String memberNo = orderInfo.getMemberNo();
 
         // 1. 회원 적립금 조회
         Member member = memberMapper.selectMemberByMemberNo(memberNo)
@@ -71,8 +74,16 @@ public class PointStrategy implements PaymentStrategy {
     }
 
     @Override
-    public void refund(String tid, Integer cancelAmount, Integer remainAmount) {
-        // TODO: Iteration 8에서 구현 (적립금 환불 = 회원에게 포인트 복구)
-        log.info("적립금 환불: amount={}", cancelAmount);
+    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount) {
+        // 1. 주문번호로 회원번호 조회
+        String memberNo = orderMapper.selectMemberNoByOrderNo(orderNo);
+        if (memberNo == null) {
+            throw new ApiException(ErrorCode.ORDER_NOT_FOUND);
+        }
+
+        // 2. 회원 포인트 복구 (환불금액만큼 증가)
+        memberTrxMapper.updateMemberPoints(memberNo, cancelAmount);
+
+        log.info("적립금 환불 완료: orderNo={}, memberNo={}, amount={}", orderNo, memberNo, cancelAmount);
     }
 }

@@ -112,6 +112,35 @@ export default function OrderDetailPage() {
     0
   )
 
+  // 부분취소 발생 여부 체크 (한 번이라도 부분취소가 있으면 true)
+  const hasPartialCancel = orderData.items.some(item => item.cancelQty > 0)
+
+  // 전체취소 가능 여부 (부분취소 없고, 취소 가능한 상품이 있음)
+  const canFullCancel = !hasPartialCancel && orderData.items.some(item => item.qty > item.cancelQty)
+
+  // 전체취소 처리
+  const handleFullCancel = async () => {
+    if (!confirm('모든 상품을 취소하시겠습니까?')) {
+      return
+    }
+
+    try {
+      setCancelling(true)
+      const request: OrderCancelRequest = {
+        orderNo,
+        isFullCancel: true
+      }
+      await axiosInstance.post<ApiResponse<void>>('/orders/cancel', request)
+      alert('주문이 전체 취소되었습니다.')
+      await fetchOrderDetail()
+    } catch (error: any) {
+      console.error('전체 취소 실패:', error)
+      alert(error.message ?? '전체 취소에 실패했습니다.')
+    } finally {
+      setCancelling(false)
+    }
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* 헤더 */}
@@ -202,16 +231,24 @@ export default function OrderDetailPage() {
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">결제 정보</h2>
         <div className="space-y-3">
-          {orderData.payments.map((payment, index) => (
-            <div key={index} className="flex justify-between items-center">
-              <p className="text-gray-700">
-                {payment.method === 'CARD' ? '카드' : payment.method === 'POINT' ? '포인트' : payment.method}
-              </p>
-              <p className="font-semibold text-gray-900">
-                {payment.amount.toLocaleString()}원
-              </p>
-            </div>
-          ))}
+          {orderData.payments.map((payment, index) => {
+            const methodLabel = payment.method === 'CARD' ? '카드' : payment.method === 'POINT' ? '포인트' : payment.method
+            const pgLabel = payment.pgType === 'INICIS' ? '이니시스' : payment.pgType === 'TOSS' ? '토스페이먼츠' : payment.pgType === 'POINT' ? '적립금' : payment.pgType
+
+            return (
+              <div key={index} className="flex justify-between items-center">
+                <div>
+                  <p className="text-gray-700">{methodLabel}</p>
+                  {payment.pgType && (
+                    <p className="text-sm text-gray-500 mt-1">PG: {pgLabel}</p>
+                  )}
+                </div>
+                <p className="font-semibold text-gray-900">
+                  {payment.amount.toLocaleString()}원
+                </p>
+              </div>
+            )
+          })}
           <div className="pt-3 border-t border-gray-200">
             <div className="flex justify-between items-center mb-2">
               <p className="text-gray-700">총 주문금액</p>
@@ -281,6 +318,15 @@ export default function OrderDetailPage() {
         >
           목록으로
         </button>
+        {canFullCancel && (
+          <button
+            onClick={handleFullCancel}
+            disabled={cancelling}
+            className="flex-1 px-6 py-3 text-white bg-red-600 rounded-md hover:bg-red-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {cancelling ? '처리중...' : '전체취소'}
+          </button>
+        )}
       </div>
     </div>
   )

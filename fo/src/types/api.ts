@@ -95,6 +95,7 @@ export interface OrderDetailItem {
  * 결제 정보
  */
 export interface PaymentInfo {
+  pgType?: string
   method: string
   amount: number
 }
@@ -104,6 +105,7 @@ export interface PaymentInfo {
  */
 export interface OrderCancelRequest {
   orderNo: string
-  orderSeq: number
-  cancelQty: number
+  orderSeq?: number
+  cancelQty?: number
+  isFullCancel?: boolean
 }

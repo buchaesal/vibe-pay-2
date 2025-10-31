@@ -18,9 +18,12 @@ public class OrderCancelRequest {
     @NotBlank
     private String orderNo;
 
-    @NotNull
+    // 부분취소 시 필수
     private Integer orderSeq;
 
-    @NotNull
+    // 부분취소 시 필수
     private Integer cancelQty;
+
+    // 전체취소 여부 (true면 orderSeq, cancelQty 무시)
+    private Boolean isFullCancel;
 }

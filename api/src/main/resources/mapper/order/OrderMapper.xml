@@ -121,7 +121,7 @@
           LEFT JOIN PAYMENT P ON OB.ORDER_NO = P.ORDER_NO AND P.PAYMENT_TYPE = 'PAYMENT'
          WHERE OB.ORDER_NO = #{orderNo}
            AND OD.ORDER_TYPE = 'ORDER'
-         GROUP BY OB.ORDER_NO, OB.ORDER_DATETIME, OP.PRODUCT_NAME, OP.PRICE, OD.ORDER_QTY, P.PAYMENT_METHOD, P.PAYMENT_AMOUNT
+         GROUP BY OB.ORDER_NO, OB.ORDER_DATETIME, OD.ORDER_SEQ, OP.PRODUCT_NAME, OP.PRICE, OD.ORDER_QTY, P.PAYMENT_METHOD, P.PAYMENT_AMOUNT
          ORDER BY OD.ORDER_SEQ ASC
     </select>
 
@@ -143,6 +143,7 @@
             <result property="cancelQty" column="CANCEL_QTY"/>
         </collection>
         <collection property="payments" ofType="vibe.api.dto.response.OrderDetailResponse$PaymentInfo">
+            <result property="pgType" column="PG_TYPE"/>
             <result property="method" column="PAYMENT_METHOD"/>
             <result property="amount" column="PAYMENT_AMOUNT"/>
         </collection>
@@ -162,6 +163,7 @@
              , OP.PRICE
              , OD.ORDER_QTY AS QTY
              , OD.CANCEL_QTY
+             , P.PG_TYPE AS PG_TYPE
              , P.PAYMENT_METHOD
              , P.PAYMENT_AMOUNT
           FROM ORDER_BASE OB
@@ -177,6 +179,14 @@
     <select id="selectNextClaimNo" resultType="string">
         SELECT /* OrderMapper.selectNextClaimNo */
                'C' || TO_CHAR(CURRENT_DATE, 'YYYYMMDD') || LPAD(NEXTVAL('SEQ_CLAIM_NO')::TEXT, 6, '0')
+    </select>
+
+    <!-- 주문번호로 회원번호 조회 -->
+    <select id="selectMemberNoByOrderNo" parameterType="string" resultType="string">
+        SELECT /* OrderMapper.selectMemberNoByOrderNo */
+               MEMBER_NO
+          FROM ORDER_BASE
+         WHERE ORDER_NO = #{orderNo}
     </select>
 
 </mapper>

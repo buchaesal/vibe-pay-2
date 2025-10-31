@@ -1,6 +1,7 @@
 package vibe.api.repository;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import vibe.api.entity.PaymentInterface;
 
 /**
@@ -14,6 +15,14 @@ import vibe.api.entity.PaymentInterface;
 public interface PaymentInterfaceTrxMapper {
     /**
      * 결제 인터페이스 로그 INSERT
+     * @return interfaceSeq (PK)
      */
-    void insertPaymentInterface(PaymentInterface paymentInterface);
+    Long insertPaymentInterface(PaymentInterface paymentInterface);
+
+    /**
+     * 결제 인터페이스 로그 UPDATE (응답값 업데이트)
+     */
+    void updatePaymentInterfaceResponse(@Param("interfaceSeq") Long interfaceSeq,
+                                        @Param("responseJson") String responseJson,
+                                        @Param("resultCode") String resultCode);
 }

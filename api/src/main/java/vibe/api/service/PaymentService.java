@@ -22,7 +22,7 @@ public interface PaymentService {
     /**
      * 결제 처리 (전략 패턴)
      */
-    void processPayments(String orderNo, List<CreateOrderRequest.PaymentInfo> payments);
+    void processPayments(CreateOrderRequest orderRequest);
 
     /**
      * 결제 취소 처리

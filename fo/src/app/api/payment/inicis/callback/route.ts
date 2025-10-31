@@ -33,6 +33,12 @@ export async function POST(request: NextRequest) {
 
     // 인증 실패
     if (resultCode !== '0000') {
+      // 사용자가 결제창 닫기 버튼 클릭 (V801)
+      if (resultCode === 'V801') {
+        console.log('사용자가 결제창을 닫았습니다.')
+        return NextResponse.redirect(new URL('/orders/form', request.url))
+      }
+
       console.error('이니시스 인증 실패:', resultCode, resultMsg)
       const errorParams = new URLSearchParams({
         error: 'true',

@@ -79,21 +79,33 @@ export const getPaymentParamsApi = async (orderNo: string, price: number): Promi
 }
 
 /**
- * 주문 생성 요청
+ * 주문 기본 정보
  */
-export interface CreateOrderRequest {
+export interface OrderInfo {
   orderNo: string
   memberNo: string
   ordererName: string
   ordererPhone: string
   ordererEmail: string
-  payments: Array<{
-    pgType: string
-    method: string
-    amount: number
-    authResult: any
-  }>
   cartIdList: number[]
+}
+
+/**
+ * 결제 정보
+ */
+export interface PaymentInfo {
+  pgType: string
+  method: string
+  amount: number
+  authResult: any
+}
+
+/**
+ * 주문 생성 요청
+ */
+export interface CreateOrderRequest {
+  orderInfo: OrderInfo
+  payments: PaymentInfo[]
 }
 
 /**

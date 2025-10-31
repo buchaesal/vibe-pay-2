@@ -4,7 +4,7 @@
 <mapper namespace="vibe.api.repository.PaymentInterfaceTrxMapper">
 
     <!-- 결제 인터페이스 로그 INSERT -->
-    <insert id="insertPaymentInterface" parameterType="vibe.api.entity.PaymentInterface">
+    <insert id="insertPaymentInterface" parameterType="vibe.api.entity.PaymentInterface" useGeneratedKeys="true" keyProperty="interfaceSeq">
         INSERT /* PaymentInterfaceTrxMapper.insertPaymentInterface */
           INTO PAYMENT_INTERFACE (
                PG_TYPE
@@ -14,7 +14,7 @@
              , PAYMENT_NO
              , REQUEST_JSON
              , RESPONSE_JSON
-             , RESULT
+             , RESULT_CODE
              , CREATED_AT
         )
         VALUES (
@@ -25,9 +25,19 @@
              , #{paymentNo}
              , #{requestJson}
              , #{responseJson}
-             , #{result}
+             , #{resultCode}
              , NOW()
         )
     </insert>
+
+    <!-- 결제 인터페이스 로그 UPDATE (응답값 업데이트) -->
+    <update id="updatePaymentInterfaceResponse">
+        UPDATE /* PaymentInterfaceTrxMapper.updatePaymentInterfaceResponse */
+               PAYMENT_INTERFACE
+           SET RESPONSE_JSON = #{responseJson}
+             , RESULT_CODE = #{resultCode}
+             , UPDATED_AT = NOW()
+         WHERE INTERFACE_SEQ = #{interfaceSeq}
+    </update>
 
 </mapper>

@@ -49,4 +49,9 @@ public interface OrderMapper {
      * 형식: C + YYYYMMDD + 시퀀스 6자리
      */
     String selectNextClaimNo();
+
+    /**
+     * 주문번호로 회원번호 조회
+     */
+    String selectMemberNoByOrderNo(@Param("orderNo") String orderNo);
 }

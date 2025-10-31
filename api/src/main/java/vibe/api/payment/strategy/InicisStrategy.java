@@ -1,16 +1,12 @@
 package vibe.api.payment.strategy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import vibe.api.dto.request.CreateOrderRequest;
+import vibe.api.dto.request.OrderInfo;
+import vibe.api.dto.request.PaymentInfo;
 import vibe.api.entity.Payment;
-import vibe.api.entity.PaymentInterface;
 import vibe.api.pg.InicisClient;
-import vibe.api.repository.PaymentInterfaceTrxMapper;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -28,21 +24,18 @@ import java.util.Map;
 public class InicisStrategy implements PaymentStrategy {
 
     private final InicisClient inicisClient;
-    private final PaymentInterfaceTrxMapper paymentInterfaceTrxMapper;
-    private final ObjectMapper objectMapper;
 
     @Override
-    public Payment approve(String orderNo, CreateOrderRequest.PaymentInfo paymentInfo) {
+    public Payment approve(OrderInfo orderInfo, PaymentInfo paymentInfo) {
         try {
+            String orderNo = orderInfo.getOrderNo();
+            Long paymentNo = paymentInfo.getPaymentNo();
             Map<String, Object> authResult = paymentInfo.getAuthResult();
 
-            // 1. 이니시스 승인 요청
-            Map<String, Object> approvalResult = inicisClient.approve(authResult);
+            // 1. 이니시스 승인 요청 (로깅은 Client에서 처리)
+            Map<String, Object> approvalResult = inicisClient.approve(orderNo, paymentNo, authResult);
 
-            // 2. PAYMENT_INTERFACE 로그 저장 (트랜잭션 분리)
-            savePaymentInterface("APPROVAL", orderNo, authResult, approvalResult, "SUCCESS");
-
-            // 3. Payment 객체 생성
+            // 2. Payment 객체 생성
             Payment payment = new Payment();
             payment.setOrderNo(orderNo);
             payment.setPaymentType("PAYMENT");
@@ -59,42 +52,35 @@ public class InicisStrategy implements PaymentStrategy {
             return payment;
 
         } catch (Exception e) {
-            // 실패 로그 저장
-            try {
-                savePaymentInterface("APPROVAL", orderNo, paymentInfo.getAuthResult(), null, "FAIL");
-            } catch (Exception ignored) {
-            }
             throw e;
         }
     }
 
     @Override
     public void netCancel(Map<String, Object> authResult) {
-        try {
-            inicisClient.netCancel(authResult);
+        // authResult에서 orderNo, paymentNo 추출
+        String orderNo = (String) authResult.get("orderNo");
+        Long paymentNo = authResult.get("paymentNo") != null ? ((Number) authResult.get("paymentNo")).longValue() : null;
 
-            // 망취소 로그 저장
-            savePaymentInterface("NET_CANCEL", null, authResult, null, "SUCCESS");
+        try {
+            // 망취소 (로깅은 Client에서 처리)
+            inicisClient.netCancel(orderNo, paymentNo, authResult);
 
         } catch (Exception e) {
             log.error("이니시스 망취소 실패 (무시)", e);
-            try {
-                savePaymentInterface("NET_CANCEL", null, authResult, null, "FAIL");
-            } catch (Exception ignored) {
-            }
         }
     }
 
     @Override
-    public void refund(String tid, Integer cancelAmount, Integer remainAmount) {
+    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount) {
         try {
             // 전체 취소 vs 부분 취소 판단
             if (remainAmount == 0) {
-                // 전체 취소
-                inicisClient.refund(tid);
+                // 전체 취소 (로깅은 Client에서 처리)
+                inicisClient.refund(orderNo, paymentNo, tid);
             } else {
-                // 부분 취소
-                inicisClient.partialRefund(tid, cancelAmount, remainAmount);
+                // 부분 취소 (로깅은 Client에서 처리)
+                inicisClient.partialRefund(orderNo, paymentNo, tid, cancelAmount, remainAmount);
             }
 
             log.info("이니시스 취소 완료: tid={}, amount={}", tid, cancelAmount);
@@ -105,28 +91,4 @@ public class InicisStrategy implements PaymentStrategy {
         }
     }
 
-    /**
-     * PAYMENT_INTERFACE 로그 저장 (트랜잭션 분리)
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected void savePaymentInterface(String transactionType, String orderNo,
-                                        Map<String, Object> request,
-                                        Map<String, Object> response,
-                                        String result) {
-        try {
-            PaymentInterface paymentInterface = new PaymentInterface();
-            paymentInterface.setPgType("INICIS");
-            paymentInterface.setTransactionType(transactionType);
-            paymentInterface.setOrderNo(orderNo);
-            paymentInterface.setRequestJson(objectMapper.writeValueAsString(request));
-            paymentInterface.setResponseJson(response != null ? objectMapper.writeValueAsString(response) : null);
-            paymentInterface.setResult(result);
-            paymentInterface.setTransactionDatetime(LocalDateTime.now());
-
-            paymentInterfaceTrxMapper.insertPaymentInterface(paymentInterface);
-
-        } catch (Exception e) {
-            log.error("PAYMENT_INTERFACE 저장 실패 (무시)", e);
-        }
-    }
 }

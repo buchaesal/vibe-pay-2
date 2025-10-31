@@ -16,6 +16,11 @@ import java.util.List;
 @Mapper
 public interface PaymentMapper {
     /**
+     * 결제번호 채번
+     */
+    Long selectNextPaymentNo();
+
+    /**
      * 주문번호로 결제 목록 조회 (환불가능금액이 있는 것만)
      */
     List<Payment> selectPaymentListByOrderNo(@Param("orderNo") String orderNo);

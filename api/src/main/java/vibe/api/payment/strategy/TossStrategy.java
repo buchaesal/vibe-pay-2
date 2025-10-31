@@ -1,16 +1,12 @@
 package vibe.api.payment.strategy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import vibe.api.dto.request.CreateOrderRequest;
+import vibe.api.dto.request.OrderInfo;
+import vibe.api.dto.request.PaymentInfo;
 import vibe.api.entity.Payment;
-import vibe.api.entity.PaymentInterface;
 import vibe.api.pg.TossClient;
-import vibe.api.repository.PaymentInterfaceTrxMapper;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -28,21 +24,18 @@ import java.util.Map;
 public class TossStrategy implements PaymentStrategy {
 
     private final TossClient tossClient;
-    private final PaymentInterfaceTrxMapper paymentInterfaceTrxMapper;
-    private final ObjectMapper objectMapper;
 
     @Override
-    public Payment approve(String orderNo, CreateOrderRequest.PaymentInfo paymentInfo) {
+    public Payment approve(OrderInfo orderInfo, PaymentInfo paymentInfo) {
         try {
+            String orderNo = orderInfo.getOrderNo();
+            Long paymentNo = paymentInfo.getPaymentNo();
             Map<String, Object> authResult = paymentInfo.getAuthResult();
 
-            // 1. 토스 승인 요청
-            Map<String, Object> approvalResult = tossClient.approve(authResult);
+            // 1. 토스 승인 요청 (로깅은 Client에서 처리)
+            Map<String, Object> approvalResult = tossClient.approve(orderNo, paymentNo, authResult);
 
-            // 2. PAYMENT_INTERFACE 로그 저장 (트랜잭션 분리)
-            savePaymentInterface("APPROVAL", orderNo, authResult, approvalResult, "SUCCESS");
-
-            // 3. Payment 객체 생성
+            // 2. Payment 객체 생성
             Payment payment = new Payment();
             payment.setOrderNo(orderNo);
             payment.setPaymentType("PAYMENT");
@@ -65,38 +58,30 @@ public class TossStrategy implements PaymentStrategy {
             return payment;
 
         } catch (Exception e) {
-            // 실패 로그 저장
-            try {
-                savePaymentInterface("APPROVAL", orderNo, paymentInfo.getAuthResult(), null, "FAIL");
-            } catch (Exception ignored) {
-            }
             throw e;
         }
     }
 
     @Override
     public void netCancel(Map<String, Object> authResult) {
-        try {
-            // 토스는 망취소 API 없음 → 일반 취소 재사용
-            tossClient.netCancel(authResult);
+        // authResult에서 orderNo, paymentNo 추출
+        String orderNo = (String) authResult.get("orderNo");
+        Long paymentNo = authResult.get("paymentNo") != null ? ((Number) authResult.get("paymentNo")).longValue() : null;
 
-            // 망취소 로그 저장
-            savePaymentInterface("NET_CANCEL", null, authResult, null, "SUCCESS");
+        try {
+            // 토스는 망취소 API 없음 → 일반 취소 재사용 (로깅은 Client에서 처리)
+            tossClient.netCancel(orderNo, paymentNo, authResult);
 
         } catch (Exception e) {
             log.error("토스 망취소 실패 (무시)", e);
-            try {
-                savePaymentInterface("NET_CANCEL", null, authResult, null, "FAIL");
-            } catch (Exception ignored) {
-            }
         }
     }
 
     @Override
-    public void refund(String tid, Integer cancelAmount, Integer remainAmount) {
+    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount) {
         try {
-            // 토스는 전체/부분 취소 API 동일
-            tossClient.refund(tid, cancelAmount);
+            // 토스는 전체/부분 취소 API 동일 (로깅은 Client에서 처리)
+            tossClient.refund(orderNo, paymentNo, tid, cancelAmount);
 
             log.info("토스 취소 완료: paymentKey={}, amount={}", tid, cancelAmount);
 
@@ -106,28 +91,4 @@ public class TossStrategy implements PaymentStrategy {
         }
     }
 
-    /**
-     * PAYMENT_INTERFACE 로그 저장 (트랜잭션 분리)
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    protected void savePaymentInterface(String transactionType, String orderNo,
-                                        Map<String, Object> request,
-                                        Map<String, Object> response,
-                                        String result) {
-        try {
-            PaymentInterface paymentInterface = new PaymentInterface();
-            paymentInterface.setPgType("TOSS");
-            paymentInterface.setTransactionType(transactionType);
-            paymentInterface.setOrderNo(orderNo);
-            paymentInterface.setRequestJson(objectMapper.writeValueAsString(request));
-            paymentInterface.setResponseJson(response != null ? objectMapper.writeValueAsString(response) : null);
-            paymentInterface.setResult(result);
-            paymentInterface.setTransactionDatetime(LocalDateTime.now());
-
-            paymentInterfaceTrxMapper.insertPaymentInterface(paymentInterface);
-
-        } catch (Exception e) {
-            log.error("PAYMENT_INTERFACE 저장 실패 (무시)", e);
-        }
-    }
 }

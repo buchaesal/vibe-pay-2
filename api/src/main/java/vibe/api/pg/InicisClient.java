@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import vibe.api.common.config.PaymentProperties;
 import vibe.api.common.enums.ErrorCode;
 import vibe.api.common.exception.ApiException;
+import vibe.api.service.PaymentInterfaceService;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,6 +31,7 @@ public class InicisClient {
     private final PaymentProperties paymentProperties;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
+    private final PaymentInterfaceService paymentInterfaceService;
 
     /**
      * 인증 파라미터 생성 (주문서 화면용)
@@ -69,7 +71,9 @@ public class InicisClient {
     /**
      * 승인 요청
      */
-    public Map<String, Object> approve(Map<String, Object> authResult) {
+    public Map<String, Object> approve(String orderNo, Long paymentNo, Map<String, Object> authResult) {
+        Long interfaceSeq = null;
+
         try {
             PaymentProperties.Inicis config = paymentProperties.getInicis();
 
@@ -99,7 +103,10 @@ public class InicisClient {
                 "format", "JSON"
             );
 
-            // WebClient로 승인 요청
+            // 1. 요청 로그 저장 (트랜잭션 분리)
+            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "APPROVAL", orderNo, paymentNo, params);
+
+            // 2. WebClient로 승인 요청
             WebClient webClient = webClientBuilder.baseUrl(authUrl).build();
 
             String response = webClient.post()
@@ -111,8 +118,12 @@ public class InicisClient {
 
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
 
+            // 3. 응답 로그 업데이트 (트랜잭션 분리) - 이니시스 resultCode 저장
+            String resultCode = (String) result.get("resultCode");
+            paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
+
             // 승인 성공 확인
-            if (!"0000".equals(result.get("resultCode"))) {
+            if (!"0000".equals(resultCode)) {
                 log.error("이니시스 승인 실패: {}", result);
                 throw new ApiException(ErrorCode.APPROVE_FAIL);
             }
@@ -131,7 +142,8 @@ public class InicisClient {
     /**
      * 전체 취소
      */
-    public void refund(String tid) {
+    public void refund(String orderNo, Long paymentNo, String tid) {
+        Long interfaceSeq = null;
         try {
             PaymentProperties.Inicis config = paymentProperties.getInicis();
 
@@ -157,6 +169,10 @@ public class InicisClient {
                 "data", data
             );
 
+            // 1. 요청 로그 저장 (트랜잭션 분리)
+            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "CANCEL", orderNo, paymentNo, requestBody);
+
+            // 2. WebClient로 취소 요청
             WebClient webClient = webClientBuilder.baseUrl(config.getRefundUrl()).build();
 
             String response = webClient.post()
@@ -168,7 +184,11 @@ public class InicisClient {
 
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
 
-            if (!"00".equals(result.get("resultCode"))) {
+            // 3. 응답 로그 업데이트 (트랜잭션 분리) - 이니시스 resultCode 저장
+            String resultCode = (String) result.get("resultCode");
+            paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
+
+            if (!"00".equals(resultCode)) {
                 log.error("이니시스 취소 실패: {}", result);
                 throw new ApiException(ErrorCode.CANCEL_FAIL);
             }
@@ -186,7 +206,8 @@ public class InicisClient {
     /**
      * 부분 취소
      */
-    public void partialRefund(String tid, Integer cancelAmount, Integer confirmPrice) {
+    public void partialRefund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer confirmPrice) {
+        Long interfaceSeq = null;
         try {
             PaymentProperties.Inicis config = paymentProperties.getInicis();
 
@@ -214,6 +235,10 @@ public class InicisClient {
                 "data", data
             );
 
+            // 1. 요청 로그 저장 (트랜잭션 분리)
+            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "CANCEL", orderNo, paymentNo, requestBody);
+
+            // 2. WebClient로 부분취소 요청
             WebClient webClient = webClientBuilder.baseUrl(config.getPartialRefundUrl()).build();
 
             String response = webClient.post()
@@ -225,7 +250,11 @@ public class InicisClient {
 
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
 
-            if (!"00".equals(result.get("resultCode"))) {
+            // 3. 응답 로그 업데이트 (트랜잭션 분리) - 이니시스 resultCode 저장
+            String resultCode = (String) result.get("resultCode");
+            paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
+
+            if (!"00".equals(resultCode)) {
                 log.error("이니시스 부분취소 실패: {}", result);
                 throw new ApiException(ErrorCode.CANCEL_FAIL);
             }
@@ -243,7 +272,8 @@ public class InicisClient {
     /**
      * 망취소
      */
-    public void netCancel(Map<String, Object> authResult) {
+    public void netCancel(String orderNo, Long paymentNo, Map<String, Object> authResult) {
+        Long interfaceSeq = null;
         try {
             PaymentProperties.Inicis config = paymentProperties.getInicis();
 
@@ -272,6 +302,10 @@ public class InicisClient {
                 "format", "JSON"
             );
 
+            // 1. 요청 로그 저장 (트랜잭션 분리)
+            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "NET_CANCEL", orderNo, paymentNo, params);
+
+            // 2. WebClient로 망취소 요청
             WebClient webClient = webClientBuilder.baseUrl(netCancelUrl).build();
 
             String response = webClient.post()
@@ -283,7 +317,11 @@ public class InicisClient {
 
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
 
-            if (!"0000".equals(result.get("resultCode"))) {
+            // 3. 응답 로그 업데이트 (트랜잭션 분리) - 이니시스 resultCode 저장
+            String resultCode = (String) result.get("resultCode");
+            paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
+
+            if (!"0000".equals(resultCode)) {
                 log.error("이니시스 망취소 실패: {}", result);
             } else {
                 log.info("이니시스 망취소 성공");

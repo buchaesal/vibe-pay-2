@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createOrderApi, CreateOrderRequest } from '@/api/order'
 
@@ -9,8 +9,14 @@ function OrderProcessingContent() {
   const searchParams = useSearchParams()
   const [isProcessing, setIsProcessing] = useState(true)
   const [message, setMessage] = useState('결제 처리 중입니다...')
+  const hasProcessed = useRef(false)
 
   useEffect(() => {
+    // 이미 처리되었으면 중복 실행 방지
+    if (hasProcessed.current) {
+      return
+    }
+    hasProcessed.current = true
     processOrder()
   }, [])
 
@@ -24,20 +30,12 @@ function OrderProcessingContent() {
 
       const orderData = JSON.parse(orderDataStr)
 
-      // PG 인증 결과 파싱
-      const resultCode = searchParams.get('resultCode')
-
       // 적립금 전액 결제인 경우
-      if (orderData.pgType === 'POINT' || orderData.payments) {
+      if (orderData.payments) {
         // 이미 payments가 구성된 경우 (적립금 전액)
         const request: CreateOrderRequest = {
-          orderNo: orderData.orderNo,
-          memberNo: orderData.memberNo,
-          ordererName: orderData.ordererName,
-          ordererPhone: orderData.ordererPhone,
-          ordererEmail: orderData.ordererEmail,
-          payments: orderData.payments,
-          cartIdList: orderData.cartIdList
+          orderInfo: orderData.orderInfo,
+          payments: orderData.payments
         }
 
         const response = await createOrderApi(request)
@@ -46,52 +44,86 @@ function OrderProcessingContent() {
         return
       }
 
-      // 카드 결제인 경우 - 인증 결과 확인
+      // 카드 결제인 경우 - PG 타입에 따라 분기
+      if (orderData.pgType === 'TOSS') {
+        // 토스 결제 - query params에서 응답 추출
+        const paymentKey = searchParams.get('paymentKey')
+        const orderId = searchParams.get('orderId')
+        const amount = searchParams.get('amount')
+
+        if (!paymentKey || !orderId || !amount) {
+          throw new Error('결제 인증 정보가 올바르지 않습니다.')
+        }
+
+        // 토스 인증 결과 구성
+        const authResult = {
+          paymentKey,
+          orderId,
+          amount: parseInt(amount)
+        }
+
+        // 주문 생성 요청 구성
+        const payments = [
+          {
+            pgType: 'TOSS',
+            method: 'CARD',
+            amount: orderData.cardAmount,
+            authResult
+          }
+        ]
+
+        // 적립금 사용 추가
+        if (orderData.pointAmount > 0) {
+          payments.push({
+            pgType: 'POINT',
+            method: 'POINT',
+            amount: orderData.pointAmount,
+            authResult: {}
+          })
+        }
+
+        const request: CreateOrderRequest = {
+          orderInfo: orderData.orderInfo,
+          payments
+        }
+
+        setMessage('주문을 생성하고 있습니다...')
+        const response = await createOrderApi(request)
+        sessionStorage.removeItem('orderData')
+        router.push(`/orders/complete?orderNo=${response.orderNo}`)
+        return
+      }
+
+      // 이니시스 결제 - 인증 결과 확인
+      const resultCode = searchParams.get('resultCode')
       if (resultCode !== '0000') {
         const errorMsg = searchParams.get('resultMsg') ?? '결제 인증에 실패했습니다.'
         throw new Error(errorMsg)
       }
 
-      // 인증 결과 데이터 구성
-      const authResult: any = {}
-
-      // 이니시스 인증 결과
-      if (orderData.pgType === 'INICIS') {
-        authResult.resultCode = searchParams.get('resultCode')
-        authResult.resultMsg = searchParams.get('resultMsg')
-        authResult.mid = searchParams.get('mid')
-        authResult.orderNumber = searchParams.get('orderNumber')
-        authResult.authToken = searchParams.get('authToken')
-        authResult.idcName = searchParams.get('idcName')
-        authResult.authUrl = searchParams.get('authUrl')
-        authResult.netCancelUrl = searchParams.get('netCancelUrl')
-        authResult.charset = searchParams.get('charset')
-        authResult.merchantData = searchParams.get('merchantData')
+      // 이니시스 인증 결과 구성
+      const authResult = {
+        resultCode: searchParams.get('resultCode'),
+        resultMsg: searchParams.get('resultMsg'),
+        mid: searchParams.get('mid'),
+        orderNumber: searchParams.get('orderNumber'),
+        authToken: searchParams.get('authToken'),
+        idcName: searchParams.get('idcName'),
+        authUrl: searchParams.get('authUrl'),
+        netCancelUrl: searchParams.get('netCancelUrl'),
+        charset: searchParams.get('charset'),
+        merchantData: searchParams.get('merchantData')
       }
 
-      // 토스 인증 결과
-      else if (orderData.pgType === 'TOSS') {
-        // TODO: 토스 인증 결과 파싱
-        authResult.paymentKey = searchParams.get('paymentKey')
-        authResult.orderId = searchParams.get('orderId')
-        authResult.amount = searchParams.get('amount')
-      }
-
-      // 주문 생성 요청 구성
-      const payments: Array<{
-        pgType: string
-        method: string
-        amount: number
-        authResult: any
-      }> = []
-
-      // 카드 결제 추가
-      payments.push({
-        pgType: orderData.pgType,
-        method: 'CARD',
-        amount: orderData.cardAmount,
-        authResult
-      })
+      // 결제 정보 구성
+      const payments = [
+        {
+          pgType: 'INICIS',
+          method: 'CARD',
+          amount: orderData.cardAmount,
+          authResult
+        }
+      ]
 
       // 적립금 사용 추가
       if (orderData.pointAmount > 0) {
@@ -105,23 +137,13 @@ function OrderProcessingContent() {
 
       // 주문 생성 API 호출
       const request: CreateOrderRequest = {
-        orderNo: orderData.orderNo,
-        memberNo: orderData.memberNo,
-        ordererName: orderData.ordererName,
-        ordererPhone: orderData.ordererPhone,
-        ordererEmail: orderData.ordererEmail,
-        payments,
-        cartIdList: orderData.cartIdList
+        orderInfo: orderData.orderInfo,
+        payments
       }
 
       setMessage('주문을 생성하고 있습니다...')
-
       const response = await createOrderApi(request)
-
-      // sessionStorage 정리
       sessionStorage.removeItem('orderData')
-
-      // 주문 완료 화면으로 이동
       router.push(`/orders/complete?orderNo=${response.orderNo}`)
 
     } catch (error: any) {

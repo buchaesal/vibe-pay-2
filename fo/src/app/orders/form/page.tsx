@@ -1,14 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { getOrderFormApi, getOrderSequenceApi, getPaymentParamsApi, OrderFormResponse } from '@/api/order'
 
-// 이니시스 JS 타입 선언
+// PG 타입 선언
 declare global {
   interface Window {
     INIStdPay: any
+    TossPayments: any
   }
 }
 
@@ -20,7 +21,8 @@ export default function OrderFormPage() {
   const [orderNo, setOrderNo] = useState<string>('')
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('CARD')
   const [pointAmount, setPointAmount] = useState<number>(0)
-  const [isInicisScriptLoaded, setIsInicisScriptLoaded] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false)
+  const inicisFormRef = useRef<HTMLFormElement>(null)
 
   // 주문서 데이터 조회
   const fetchOrderForm = async () => {
@@ -53,25 +55,6 @@ export default function OrderFormPage() {
     fetchOrderForm()
   }, [isLoggedIn, member, router])
 
-  // 이니시스 JS 로드
-  useEffect(() => {
-    const script = document.createElement('script')
-    script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js'
-    script.async = true
-    script.onload = () => {
-      setIsInicisScriptLoaded(true)
-      console.log('이니시스 JS 로드 완료')
-    }
-    script.onerror = () => {
-      console.error('이니시스 JS 로드 실패')
-    }
-    document.body.appendChild(script)
-
-    return () => {
-      document.body.removeChild(script)
-    }
-  }, [])
-
   // 결제하기
   const handlePayment = async () => {
     if (!orderFormData || orderFormData.cartList.length === 0) {
@@ -91,11 +74,14 @@ export default function OrderFormPage() {
       try {
         // sessionStorage에 주문 데이터 저장
         const orderData = {
-          orderNo,
-          memberNo: member.memberNo,
-          ordererName: orderFormData.memberInfo.name,
-          ordererPhone: orderFormData.memberInfo.phone,
-          ordererEmail: orderFormData.memberInfo.email,
+          orderInfo: {
+            orderNo,
+            memberNo: member.memberNo,
+            ordererName: orderFormData.memberInfo.name,
+            ordererPhone: orderFormData.memberInfo.phone,
+            ordererEmail: orderFormData.memberInfo.email,
+            cartIdList: orderFormData.cartList.map((item) => item.cartId)
+          },
           payments: [
             {
               pgType: 'POINT',
@@ -103,8 +89,7 @@ export default function OrderFormPage() {
               amount: pointAmount,
               authResult: {}
             }
-          ],
-          cartIdList: orderFormData.cartList.map((item) => item.cartId)
+          ]
         }
         sessionStorage.setItem('orderData', JSON.stringify(orderData))
 
@@ -124,15 +109,17 @@ export default function OrderFormPage() {
 
       // 주문 데이터 sessionStorage에 저장
       const orderData = {
-        orderNo,
-        memberNo: member.memberNo,
-        ordererName: orderFormData.memberInfo.name,
-        ordererPhone: orderFormData.memberInfo.phone,
-        ordererEmail: orderFormData.memberInfo.email,
+        orderInfo: {
+          orderNo,
+          memberNo: member.memberNo,
+          ordererName: orderFormData.memberInfo.name,
+          ordererPhone: orderFormData.memberInfo.phone,
+          ordererEmail: orderFormData.memberInfo.email,
+          cartIdList: orderFormData.cartList.map((item) => item.cartId)
+        },
         cardAmount,
         pointAmount,
-        pgType,
-        cartIdList: orderFormData.cartList.map((item) => item.cartId)
+        pgType
       }
       sessionStorage.setItem('orderData', JSON.stringify(orderData))
 
@@ -148,48 +135,153 @@ export default function OrderFormPage() {
     }
   }
 
-  // 이니시스 결제 처리
-  const handleInicisPayment = async (amount: number) => {
-    if (!isInicisScriptLoaded || !window.INIStdPay) {
-      alert('결제 모듈을 불러오는 중입니다. 잠시 후 다시 시도해주세요.')
-      return
-    }
+  // 이니시스 JS 동적 로드
+  const loadInicisScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // 이미 로드되어 있으면 바로 resolve
+      if (window.INIStdPay) {
+        console.log('이니시스 JS 이미 로드됨')
+        resolve()
+        return
+      }
 
+      // 스크립트가 이미 DOM에 있는지 확인
+      const existingScript = document.querySelector('script[src="https://stdpay.inicis.com/stdjs/INIStdPay.js"]')
+      if (existingScript) {
+        // 있다면 로드 완료를 기다림
+        existingScript.addEventListener('load', () => resolve())
+        existingScript.addEventListener('error', () => reject(new Error('이니시스 JS 로드 실패')))
+        return
+      }
+
+      // 새로 스크립트 생성 및 로드
+      const script = document.createElement('script')
+      script.src = 'https://stdpay.inicis.com/stdjs/INIStdPay.js'
+      script.async = true
+      script.onload = () => {
+        console.log('이니시스 JS 로드 완료')
+        resolve()
+      }
+      script.onerror = () => {
+        reject(new Error('이니시스 JS 로드 실패'))
+      }
+      document.body.appendChild(script)
+    })
+  }
+
+  // 이니시스 결제 처리 (Form Submit 방식)
+  const handleInicisPayment = async (amount: number) => {
     try {
+      // 이니시스 스크립트 로드
+      await loadInicisScript()
+
+      if (!window.INIStdPay) {
+        throw new Error('결제 모듈을 불러올 수 없습니다.')
+      }
+
       // 인증 파라미터 조회
       const params = await getPaymentParamsApi(orderNo, amount)
 
-      // 이니시스 결제창 호출
-      window.INIStdPay.pay({
-        version: '1.0',
-        gopaymethod: 'Card',
-        mid: params.mid,
-        oid: orderNo,
-        price: amount,
-        timestamp: params.timestamp,
-        use_chkfake: '',
-        signature: params.signature,
-        verification: params.verification,
-        mKey: params.mKey,
-        currency: 'WON',
-        goodname: orderFormData?.cartList[0]?.productName ?? '상품',
-        buyername: member?.name ?? '',
-        buyertel: member?.phone ?? '',
-        buyeremail: member?.email ?? '',
-        returnUrl: `${window.location.origin}/api/payment/inicis/callback`,
-        closeUrl: window.location.href,
-        acceptmethod: 'HPP(1):below1000'
-      })
+      // Form에 파라미터 설정
+      const form = inicisFormRef.current
+      if (!form) {
+        throw new Error('결제 폼을 찾을 수 없습니다.')
+      }
+
+      // Form input 값 설정
+      const setInputValue = (name: string, value: string | number) => {
+        const input = form.querySelector(`input[name="${name}"]`) as HTMLInputElement
+        if (input) {
+          input.value = String(value)
+        }
+      }
+
+      setInputValue('mid', params.mid)
+      setInputValue('oid', orderNo)
+      setInputValue('price', amount)
+      setInputValue('timestamp', params.timestamp)
+      setInputValue('signature', params.signature)
+      setInputValue('verification', params.verification)
+      setInputValue('mKey', params.mkey)
+      setInputValue('goodname', orderFormData?.cartList[0]?.productName ?? '상품')
+      setInputValue('buyername', member?.name ?? '')
+      setInputValue('buyertel', member?.phone ?? '')
+      setInputValue('buyeremail', member?.email ?? '')
+      setInputValue('returnUrl', `${window.location.origin}/api/payment/inicis/callback`)
+      setInputValue('closeUrl', '')
+
+      // 이니시스 결제창 호출 (form 전달)
+      window.INIStdPay.pay('inicisPayForm')
+
     } catch (error: any) {
       console.error('이니시스 결제 실패:', error)
       alert(error.message ?? '결제 처리 중 오류가 발생했습니다.')
     }
   }
 
+  // 토스 결제 SDK 동적 로드
+  const loadTossScript = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // 이미 로드되어 있으면 바로 resolve
+      if (window.TossPayments) {
+        console.log('토스 SDK 이미 로드됨')
+        resolve()
+        return
+      }
+
+      // 스크립트가 이미 DOM에 있는지 확인
+      const existingScript = document.querySelector('script[src="https://js.tosspayments.com/v1/payment"]')
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve())
+        existingScript.addEventListener('error', () => reject(new Error('토스 SDK 로드 실패')))
+        return
+      }
+
+      // 새로 스크립트 생성 및 로드
+      const script = document.createElement('script')
+      script.src = 'https://js.tosspayments.com/v1/payment'
+      script.async = true
+      script.onload = () => {
+        console.log('토스 SDK 로드 완료')
+        resolve()
+      }
+      script.onerror = () => {
+        reject(new Error('토스 SDK 로드 실패'))
+      }
+      document.body.appendChild(script)
+    })
+  }
+
   // 토스 결제 처리
   const handleTossPayment = async (amount: number) => {
-    // TODO: 토스 결제 구현
-    alert('토스 결제는 추후 구현 예정입니다.')
+    try {
+      // 토스 SDK 로드
+      await loadTossScript()
+
+      if (!window.TossPayments) {
+        throw new Error('결제 모듈을 불러올 수 없습니다.')
+      }
+
+      // 토스페이먼츠 객체 생성
+      const clientKey = 'test_ck_DpexMgkW36PL5OnYYn7drGbR5ozO'
+      const tossPayments = window.TossPayments(clientKey)
+
+      // 결제 요청
+      await tossPayments.requestPayment('카드', {
+        amount,
+        orderId: orderNo,
+        orderName: orderFormData?.cartList[0]?.productName ?? '상품',
+        customerName: member?.name ?? '',
+        customerEmail: member?.email ?? '',
+        customerMobilePhone: member?.phone ?? '',
+        successUrl: `${window.location.origin}/orders/processing`,
+        failUrl: `${window.location.origin}/orders/fail`
+      })
+
+    } catch (error: any) {
+      console.error('토스 결제 실패:', error)
+      alert(error.message ?? '결제 처리 중 오류가 발생했습니다.')
+    }
   }
 
   if (loading) {
@@ -351,6 +443,26 @@ export default function OrderFormPage() {
         </div>
       </div>
 
+      {/* 약관 동의 */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <div className="space-y-3">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            />
+            <span className="ml-3 text-sm text-gray-900">
+              <span className="font-semibold">[필수]</span> 주문 내용을 확인하였으며, 결제 진행에 동의합니다.
+            </span>
+          </label>
+          <p className="text-xs text-gray-500 ml-8">
+            주문할 상품의 정보, 결제 금액을 확인하였으며, 개인정보 제공 및 결제 대행 서비스 이용약관에 동의합니다.
+          </p>
+        </div>
+      </div>
+
       {/* 결제 버튼 */}
       <div className="flex gap-3">
         <button
@@ -361,12 +473,34 @@ export default function OrderFormPage() {
         </button>
         <button
           onClick={handlePayment}
-          disabled={orderFormData.cartList.length === 0}
+          disabled={orderFormData.cartList.length === 0 || !agreedToTerms}
           className="flex-1 py-3 text-lg font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
         >
           결제하기
         </button>
       </div>
+
+      {/* 이니시스 결제 Form (숨김) */}
+      <form ref={inicisFormRef} id="inicisPayForm" style={{ display: 'none' }}>
+        <input type="hidden" name="version" value="1.0" />
+        <input type="hidden" name="gopaymethod" value="Card" />
+        <input type="hidden" name="mid" value="" />
+        <input type="hidden" name="oid" value="" />
+        <input type="hidden" name="price" value="" />
+        <input type="hidden" name="timestamp" value="" />
+        <input type="hidden" name="signature" value="" />
+        <input type="hidden" name="verification" value="" />
+        <input type="hidden" name="mKey" value="" />
+        <input type="hidden" name="currency" value="WON" />
+        <input type="hidden" name="goodname" value="" />
+        <input type="hidden" name="buyername" value="" />
+        <input type="hidden" name="buyertel" value="" />
+        <input type="hidden" name="buyeremail" value="" />
+        <input type="hidden" name="returnUrl" value="" />
+        <input type="hidden" name="closeUrl" value="" />
+        <input type="hidden" name="acceptmethod" value="HPP(1):below1000" />
+        <input type="hidden" name="use_chkfake" value="" />
+      </form>
     </div>
   )
 }

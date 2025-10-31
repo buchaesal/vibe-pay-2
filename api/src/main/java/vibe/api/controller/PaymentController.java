@@ -66,10 +66,7 @@ public class PaymentController {
      */
     @PostMapping("/orders")
     public Response<CreateOrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
-        log.info("주문 생성 요청: orderNo={}, memberNo={}", request.getOrderNo(), request.getMemberNo());
-
         CreateOrderResponse response = orderService.createOrder(request);
-
         return new Response<>(response);
     }
 }

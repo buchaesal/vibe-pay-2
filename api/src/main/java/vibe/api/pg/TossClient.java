@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import vibe.api.common.config.PaymentProperties;
 import vibe.api.common.enums.ErrorCode;
 import vibe.api.common.exception.ApiException;
+import vibe.api.service.PaymentInterfaceService;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -28,11 +29,14 @@ public class TossClient {
     private final PaymentProperties paymentProperties;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
+    private final PaymentInterfaceService paymentInterfaceService;
 
     /**
      * 승인 요청
      */
-    public Map<String, Object> approve(Map<String, Object> authResult) {
+    public Map<String, Object> approve(String orderNo, Long paymentNo, Map<String, Object> authResult) {
+        Long interfaceSeq = null;
+
         try {
             PaymentProperties.Toss config = paymentProperties.getToss();
 
@@ -51,6 +55,10 @@ public class TossClient {
                 "amount", amount
             );
 
+            // 1. 요청 로그 저장 (트랜잭션 분리)
+            interfaceSeq = paymentInterfaceService.saveRequest("TOSS", "APPROVAL", orderNo, paymentNo, requestBody);
+
+            // 2. WebClient로 승인 요청
             WebClient webClient = webClientBuilder
                 .baseUrl(config.getApiBaseUrl())
                 .build();
@@ -66,8 +74,13 @@ public class TossClient {
 
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
 
+            // 3. 응답 로그 업데이트 (트랜잭션 분리) - 토스 status 저장
+            String status = (String) result.get("status");
+            String resultCode = status != null ? status : (String) result.get("code"); // 성공시 status, 에러시 code
+            paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
+
             // 승인 성공 확인 (status = DONE)
-            if (!"DONE".equals(result.get("status"))) {
+            if (!"DONE".equals(status)) {
                 log.error("토스 승인 실패: {}", result);
                 throw new ApiException(ErrorCode.APPROVE_FAIL);
             }
@@ -86,8 +99,10 @@ public class TossClient {
     /**
      * 취소 (전체/부분 모두 동일 API)
      */
-    public void refund(String paymentKey, Integer cancelAmount) {
-        try {
+    public void refund(String orderNo, Long paymentNo, String paymentKey, Integer cancelAmount) {
+        Long interfaceSeq = null;
+
+        try{
             PaymentProperties.Toss config = paymentProperties.getToss();
 
             // Basic Auth 인증 헤더 생성
@@ -100,6 +115,10 @@ public class TossClient {
                 "cancelAmount", cancelAmount
             );
 
+            // 1. 요청 로그 저장 (트랜잭션 분리)
+            interfaceSeq = paymentInterfaceService.saveRequest("TOSS", "CANCEL", orderNo, paymentNo, requestBody);
+
+            // 2. WebClient로 취소 요청
             WebClient webClient = webClientBuilder
                 .baseUrl(config.getApiBaseUrl())
                 .build();
@@ -115,8 +134,13 @@ public class TossClient {
 
             Map<String, Object> result = objectMapper.readValue(response, Map.class);
 
+            // 3. 응답 로그 업데이트 (트랜잭션 분리) - 토스 status 저장
+            String status = (String) result.get("status");
+            String resultCode = status != null ? status : (String) result.get("code"); // 성공시 status, 에러시 code
+            paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
+
             // 취소 성공 확인 (status = CANCELED)
-            if (!"CANCELED".equals(result.get("status"))) {
+            if (!"CANCELED".equals(status)) {
                 log.error("토스 취소 실패: {}", result);
                 throw new ApiException(ErrorCode.CANCEL_FAIL);
             }
@@ -134,13 +158,13 @@ public class TossClient {
     /**
      * 망취소 (토스는 별도 API 없음 - 일반 취소 재사용)
      */
-    public void netCancel(Map<String, Object> authResult) {
+    public void netCancel(String orderNo, Long paymentNo, Map<String, Object> authResult) {
         try {
             String paymentKey = (String) authResult.get("paymentKey");
             Integer amount = (Integer) authResult.get("amount");
 
             // 일반 취소 API 재사용
-            refund(paymentKey, amount);
+            refund(orderNo, paymentNo, paymentKey, amount);
 
             log.info("토스 망취소 성공: paymentKey={}", paymentKey);
 
