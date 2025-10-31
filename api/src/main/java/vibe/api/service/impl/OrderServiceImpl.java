@@ -105,26 +105,45 @@ public class OrderServiceImpl implements OrderService {
      * 4. ORDER_DETAIL INSERT (상품별 주문 상세)
      * 5. 결제 처리 (PaymentService.processPayments)
      * 6. ORDER_DETAIL 완료일시 업데이트
-     * 7. 장바구니 삭제 (별도 트랜잭션)
+     * 7. 장바구니 삭제
      */
     @Override
     @Transactional
     public CreateOrderResponse createOrder(CreateOrderRequest request) {
-        log.info("주문 생성 시작: orderNo={}, memberNo={}",
-            request.getOrderInfo().getOrderNo(), request.getOrderInfo().getMemberNo());
-
         String orderNo = request.getOrderInfo().getOrderNo();
+        log.info("주문 생성 시작: orderNo={}, memberNo={}", orderNo, request.getOrderInfo().getMemberNo());
+
+        List<CartResponse> cartItems = validateAndGetCartItems(request.getOrderInfo().getCartIdList());
         LocalDateTime orderDatetime = LocalDateTime.now();
 
-        // 1. 장바구니 조회
-        List<CartResponse> cartItems = cartMapper.selectCartByIds(request.getOrderInfo().getCartIdList());
+        createOrderBase(request, orderNo, orderDatetime);
+        createOrderProducts(cartItems, orderNo);
+        createOrderDetails(cartItems, orderNo, orderDatetime);
+
+        processPayment(request, orderNo);
+
+        completeOrder(orderNo, request.getOrderInfo().getCartIdList());
+
+        log.info("주문 생성 완료: orderNo={}", orderNo);
+        return new CreateOrderResponse(orderNo, "SUCCESS");
+    }
+
+    /**
+     * 장바구니 검증 및 조회
+     */
+    private List<CartResponse> validateAndGetCartItems(List<Long> cartIdList) {
+        List<CartResponse> cartItems = cartMapper.selectCartByIds(cartIdList);
         if (cartItems == null || cartItems.isEmpty()) {
             throw new ApiException(ErrorCode.CART_NOT_FOUND);
         }
-
         log.debug("장바구니 조회 완료: count={}", cartItems.size());
+        return cartItems;
+    }
 
-        // 2. ORDER_BASE INSERT
+    /**
+     * ORDER_BASE 생성
+     */
+    private void createOrderBase(CreateOrderRequest request, String orderNo, LocalDateTime orderDatetime) {
         OrderBase orderBase = new OrderBase();
         orderBase.setOrderNo(orderNo);
         orderBase.setMemberNo(request.getOrderInfo().getMemberNo());
@@ -135,9 +154,12 @@ public class OrderServiceImpl implements OrderService {
 
         orderTrxMapper.insertOrderBase(orderBase);
         log.debug("ORDER_BASE 생성 완료: orderNo={}", orderNo);
+    }
 
-        // 3. ORDER_PRODUCT INSERT (상품별 스냅샷)
-        Map<String, CartResponse> productMap = new HashMap<>();
+    /**
+     * ORDER_PRODUCT 생성 (상품별 스냅샷)
+     */
+    private void createOrderProducts(List<CartResponse> cartItems, String orderNo) {
         for (CartResponse cart : cartItems) {
             OrderProduct orderProduct = new OrderProduct();
             orderProduct.setOrderNo(orderNo);
@@ -146,11 +168,14 @@ public class OrderServiceImpl implements OrderService {
             orderProduct.setPrice(cart.getPrice());
 
             orderTrxMapper.insertOrderProduct(orderProduct);
-            productMap.put(cart.getProductNo(), cart);
         }
         log.debug("ORDER_PRODUCT 생성 완료: count={}", cartItems.size());
+    }
 
-        // 4. ORDER_DETAIL INSERT (상품별 주문 상세)
+    /**
+     * ORDER_DETAIL 생성 (상품별 주문 상세)
+     */
+    private void createOrderDetails(List<CartResponse> cartItems, String orderNo, LocalDateTime orderDatetime) {
         int orderSeq = 1;
         for (CartResponse cart : cartItems) {
             OrderDetail orderDetail = new OrderDetail();
@@ -162,7 +187,7 @@ public class OrderServiceImpl implements OrderService {
             orderDetail.setProductNo(cart.getProductNo());
             orderDetail.setOrderType("ORDER");
             orderDetail.setOrderDatetime(orderDatetime);
-            orderDetail.setCompleteDatetime(null);  // 결제 완료 후 업데이트
+            orderDetail.setCompleteDatetime(null);
             orderDetail.setOrderQty(cart.getQty());
             orderDetail.setCancelQty(0);
 
@@ -170,27 +195,30 @@ public class OrderServiceImpl implements OrderService {
             orderSeq++;
         }
         log.debug("ORDER_DETAIL 생성 완료: count={}", cartItems.size());
+    }
 
-        // 5. 결제 처리 (전략 패턴 + 망취소)
+    /**
+     * 결제 처리
+     */
+    private void processPayment(CreateOrderRequest request, String orderNo) {
         try {
             paymentService.processPayments(request);
             log.info("결제 처리 완료: orderNo={}", orderNo);
         } catch (Exception e) {
             log.error("결제 처리 실패: orderNo={}", orderNo, e);
-            throw e;  // 트랜잭션 롤백 (ORDER_BASE, ORDER_PRODUCT, ORDER_DETAIL 모두 롤백)
+            throw e;  // 트랜잭션 롤백
         }
+    }
 
-        // 6. ORDER_DETAIL 완료일시 업데이트
+    /**
+     * 주문 완료 처리
+     */
+    private void completeOrder(String orderNo, List<Long> cartIdList) {
         orderTrxMapper.updateOrderDetailComplete(orderNo);
         log.debug("ORDER_DETAIL 완료일시 업데이트: orderNo={}", orderNo);
 
-        // 7. 장바구니 삭제 (별도 트랜잭션으로 분리하지 않고 같은 트랜잭션에서 처리)
-        cartTrxMapper.deleteCartByIds(request.getOrderInfo().getCartIdList());
-        log.debug("장바구니 삭제 완료: count={}", request.getOrderInfo().getCartIdList().size());
-
-        log.info("주문 생성 완료: orderNo={}", orderNo);
-
-        return new CreateOrderResponse(orderNo, "SUCCESS");
+        cartTrxMapper.deleteCartByIds(cartIdList);
+        log.debug("장바구니 삭제 완료: count={}", cartIdList.size());
     }
 
     /**
