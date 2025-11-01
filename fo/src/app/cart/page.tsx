@@ -3,12 +3,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
-import { getCartListApi, deleteCartApi } from '@/api/cart'
+import { useModalStore } from '@/store/modalStore'
+import { getCartListApi, deleteCartApi, updateCartQtyApi } from '@/api/cart'
 import { CartItem } from '@/types/api'
 
 export default function CartPage() {
   const router = useRouter()
   const { isLoggedIn, member } = useAuthStore()
+  const { showAlert, showConfirm } = useModalStore()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCartIds, setSelectedCartIds] = useState<number[]>([])
@@ -26,7 +28,7 @@ export default function CartPage() {
       setCartItems(data)
     } catch (error: any) {
       console.error('장바구니 목록 조회 실패:', error)
-      alert(error.message ?? '장바구니 목록을 불러오지 못했습니다.')
+      showAlert(error.message ?? '장바구니 목록을 불러오지 못했습니다.', 'error')
     } finally {
       setLoading(false)
     }
@@ -37,7 +39,7 @@ export default function CartPage() {
     if (hasFetchedRef.current) return
 
     if (!isLoggedIn || !member) {
-      alert('로그인이 필요합니다.')
+      showAlert('로그인이 필요합니다.', 'warning')
       router.push('/')
       return
     }
@@ -65,25 +67,42 @@ export default function CartPage() {
     }
   }
 
-  // 선택 삭제
-  const handleDeleteSelected = async () => {
-    if (selectedCartIds.length === 0) {
-      alert('삭제할 상품을 선택해주세요.')
-      return
-    }
-
-    if (!confirm(`선택한 ${selectedCartIds.length}개의 상품을 삭제하시겠습니까?`)) {
+  // 수량 변경
+  const handleUpdateQty = async (cartId: number, newQty: number) => {
+    if (newQty < 1) {
+      showAlert('수량은 1개 이상이어야 합니다.', 'warning')
       return
     }
 
     try {
-      await deleteCartApi({ cartIdList: selectedCartIds })
-      alert('선택한 상품이 삭제되었습니다.')
-      setSelectedCartIds([])
+      await updateCartQtyApi({ cartId, qty: newQty })
       fetchCartList()
     } catch (error: any) {
-      alert(error.message ?? '상품 삭제에 실패했습니다.')
+      showAlert(error.message ?? '수량 변경에 실패했습니다.', 'error')
     }
+  }
+
+  // 선택 삭제
+  const handleDeleteSelected = () => {
+    if (selectedCartIds.length === 0) {
+      showAlert('삭제할 상품을 선택해주세요.', 'warning')
+      return
+    }
+
+    showConfirm(
+      `선택한 ${selectedCartIds.length}개의 상품을 삭제하시겠습니까?`,
+      async () => {
+        try {
+          await deleteCartApi({ cartIdList: selectedCartIds })
+          showAlert('선택한 상품이 삭제되었습니다.', 'success')
+          setSelectedCartIds([])
+          fetchCartList()
+        } catch (error: any) {
+          showAlert(error.message ?? '상품 삭제에 실패했습니다.', 'error')
+        }
+      },
+      { type: 'danger', confirmText: '삭제', cancelText: '취소' }
+    )
   }
 
   // 총 금액 계산
@@ -94,11 +113,13 @@ export default function CartPage() {
   // 주문하기
   const handleOrder = () => {
     if (selectedCartIds.length === 0) {
-      alert('주문할 상품을 선택해주세요.')
+      showAlert('주문할 상품을 선택해주세요.', 'warning')
       return
     }
 
-    router.push('/orders/form')
+    // 선택한 장바구니 ID를 쿼리 파라미터로 전달
+    const cartIdListParam = selectedCartIds.join(',')
+    router.push(`/orders/form?cartIdList=${cartIdListParam}`)
   }
 
   if (loading) {
@@ -179,12 +200,31 @@ export default function CartPage() {
 
                 {/* 상품 정보 */}
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     {item.productName}
                   </h3>
-                  <p className="text-sm text-gray-600">
-                    수량: {item.qty}개
-                  </p>
+
+                  {/* 수량 조절 */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">수량:</span>
+                    <div className="flex items-center border border-gray-300 rounded-md">
+                      <button
+                        onClick={() => handleUpdateQty(item.cartId, item.qty - 1)}
+                        className="px-3 py-1 text-gray-600 hover:bg-gray-100 transition"
+                      >
+                        -
+                      </button>
+                      <span className="px-4 py-1 text-sm font-medium text-gray-900 border-x border-gray-300">
+                        {item.qty}
+                      </span>
+                      <button
+                        onClick={() => handleUpdateQty(item.cartId, item.qty + 1)}
+                        className="px-3 py-1 text-gray-600 hover:bg-gray-100 transition"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* 가격 */}

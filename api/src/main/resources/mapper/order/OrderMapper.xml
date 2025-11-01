@@ -5,6 +5,7 @@
 
     <!-- 주문서 데이터 조회 ResultMap -->
     <resultMap id="OrderFormResultMap" type="vibe.api.dto.response.OrderFormResponse">
+        <id column="MEMBER_NO"/>
         <association property="memberInfo" javaType="vibe.api.dto.response.OrderFormResponse$MemberInfo">
             <result property="name" column="NAME"/>
             <result property="phone" column="PHONE"/>
@@ -12,7 +13,7 @@
             <result property="points" column="POINTS"/>
         </association>
         <collection property="cartList" ofType="vibe.api.dto.response.OrderFormResponse$CartItem">
-            <result property="cartId" column="CART_ID"/>
+            <id property="cartId" column="CART_ID"/>
             <result property="productNo" column="PRODUCT_NO"/>
             <result property="productName" column="PRODUCT_NAME"/>
             <result property="qty" column="QTY"/>
@@ -21,9 +22,10 @@
     </resultMap>
 
     <!-- 주문서 데이터 조회 -->
-    <select id="selectOrderFormData" parameterType="string" resultMap="OrderFormResultMap">
+    <select id="selectOrderFormData" resultMap="OrderFormResultMap">
         SELECT /* OrderMapper.selectOrderFormData */
-               M.NAME
+               M.MEMBER_NO
+             , M.NAME
              , M.PHONE
              , M.EMAIL
              , M.POINTS
@@ -36,6 +38,10 @@
           LEFT JOIN CART C ON M.MEMBER_NO = C.MEMBER_NO
           LEFT JOIN PRODUCT P ON C.PRODUCT_NO = P.PRODUCT_NO
          WHERE M.MEMBER_NO = #{memberNo}
+           AND C.CART_ID IN
+               <foreach collection="cartIdList" item="cartId" open="(" separator="," close=")">
+                   #{cartId}
+               </foreach>
          ORDER BY C.CREATED_AT DESC
     </select>
 
@@ -47,12 +53,12 @@
 
     <!-- 주문 내역 조회 ResultMap -->
     <resultMap id="OrderHistoryResultMap" type="vibe.api.dto.response.OrderHistoryResponse">
-        <result property="orderNo" column="ORDER_NO"/>
+        <id property="orderNo" column="ORDER_NO"/>
         <result property="orderDate" column="ORDER_DATE"/>
         <result property="totalAmount" column="TOTAL_AMOUNT"/>
         <result property="status" column="STATUS"/>
         <collection property="items" ofType="vibe.api.dto.response.OrderHistoryResponse$OrderHistoryItem">
-            <result property="orderSeq" column="ORDER_SEQ"/>
+            <id property="orderSeq" column="ORDER_SEQ"/>
             <result property="productNo" column="PRODUCT_NO"/>
             <result property="productName" column="PRODUCT_NAME"/>
             <result property="price" column="PRICE"/>
@@ -88,16 +94,18 @@
 
     <!-- 주문 완료 조회 ResultMap -->
     <resultMap id="OrderCompleteResultMap" type="vibe.api.dto.response.OrderCompleteResponse">
-        <result property="orderNo" column="ORDER_NO"/>
+        <id property="orderNo" column="ORDER_NO"/>
         <result property="orderDate" column="ORDER_DATE"/>
         <result property="totalAmount" column="TOTAL_AMOUNT"/>
         <result property="paymentStatus" column="PAYMENT_STATUS"/>
         <collection property="items" ofType="vibe.api.dto.response.OrderCompleteResponse$OrderCompleteItem">
+            <id column="ORDER_SEQ"/>
             <result property="productName" column="PRODUCT_NAME"/>
             <result property="price" column="PRICE"/>
             <result property="qty" column="QTY"/>
         </collection>
         <collection property="payments" ofType="vibe.api.dto.response.OrderCompleteResponse$PaymentInfo">
+            <id column="PAYMENT_NO"/>
             <result property="method" column="PAYMENT_METHOD"/>
             <result property="amount" column="PAYMENT_AMOUNT"/>
         </collection>
@@ -110,9 +118,11 @@
              , TO_CHAR(OB.ORDER_DATETIME, 'YYYY-MM-DD HH24:MI') AS ORDER_DATE
              , COALESCE(SUM(OP.PRICE * OD.ORDER_QTY), 0) AS TOTAL_AMOUNT
              , 'SUCCESS' AS PAYMENT_STATUS
+             , OD.ORDER_SEQ
              , OP.PRODUCT_NAME
              , OP.PRICE
              , OD.ORDER_QTY AS QTY
+             , P.PAYMENT_NO
              , P.PAYMENT_METHOD
              , P.PAYMENT_AMOUNT
           FROM ORDER_BASE OB
@@ -121,13 +131,13 @@
           LEFT JOIN PAYMENT P ON OB.ORDER_NO = P.ORDER_NO AND P.PAYMENT_TYPE = 'PAYMENT'
          WHERE OB.ORDER_NO = #{orderNo}
            AND OD.ORDER_TYPE = 'ORDER'
-         GROUP BY OB.ORDER_NO, OB.ORDER_DATETIME, OD.ORDER_SEQ, OP.PRODUCT_NAME, OP.PRICE, OD.ORDER_QTY, P.PAYMENT_METHOD, P.PAYMENT_AMOUNT
+         GROUP BY OB.ORDER_NO, OB.ORDER_DATETIME, OD.ORDER_SEQ, OP.PRODUCT_NAME, OP.PRICE, OD.ORDER_QTY, P.PAYMENT_NO, P.PAYMENT_METHOD, P.PAYMENT_AMOUNT
          ORDER BY OD.ORDER_SEQ ASC
     </select>
 
     <!-- 주문 상세 조회 ResultMap -->
     <resultMap id="OrderDetailResultMap" type="vibe.api.dto.response.OrderDetailResponse">
-        <result property="orderNo" column="ORDER_NO"/>
+        <id property="orderNo" column="ORDER_NO"/>
         <result property="orderDate" column="ORDER_DATE"/>
         <association property="orderer" javaType="vibe.api.dto.response.OrderDetailResponse$OrdererInfo">
             <result property="name" column="ORDERER_NAME"/>
@@ -135,7 +145,7 @@
             <result property="email" column="ORDERER_EMAIL"/>
         </association>
         <collection property="items" ofType="vibe.api.dto.response.OrderDetailResponse$OrderDetailItem">
-            <result property="orderSeq" column="ORDER_SEQ"/>
+            <id property="orderSeq" column="ORDER_SEQ"/>
             <result property="productNo" column="PRODUCT_NO"/>
             <result property="productName" column="PRODUCT_NAME"/>
             <result property="price" column="PRICE"/>
@@ -143,6 +153,7 @@
             <result property="cancelQty" column="CANCEL_QTY"/>
         </collection>
         <collection property="payments" ofType="vibe.api.dto.response.OrderDetailResponse$PaymentInfo">
+            <id column="PAYMENT_NO"/>
             <result property="pgType" column="PG_TYPE"/>
             <result property="method" column="PAYMENT_METHOD"/>
             <result property="amount" column="PAYMENT_AMOUNT"/>
@@ -163,6 +174,7 @@
              , OP.PRICE
              , OD.ORDER_QTY AS QTY
              , OD.CANCEL_QTY
+             , P.PAYMENT_NO
              , P.PG_TYPE AS PG_TYPE
              , P.PAYMENT_METHOD
              , P.PAYMENT_AMOUNT

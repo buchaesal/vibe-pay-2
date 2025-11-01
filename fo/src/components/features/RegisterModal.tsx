@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import { registerApi } from '@/api/auth'
+import { useModalStore } from '@/store/modalStore'
 
 interface RegisterModalProps {
   isOpen: boolean
@@ -21,6 +22,8 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }: Regi
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const { showAlert } = useModalStore()
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
       ...prev,
@@ -35,7 +38,7 @@ export default function RegisterModal({ isOpen, onClose, onSwitchToLogin }: Regi
 
     try {
       await registerApi(formData)
-      alert('회원가입 성공! 로그인해주세요.')
+      showAlert('회원가입 성공! 로그인해주세요.', 'success')
       onSwitchToLogin()
       setFormData({
         loginId: '',

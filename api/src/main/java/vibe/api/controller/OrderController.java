@@ -12,7 +12,9 @@ import vibe.api.dto.response.OrderHistoryResponse;
 import vibe.api.dto.response.OrderSequenceResponse;
 import vibe.api.service.OrderService;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 주문 컨트롤러
@@ -31,13 +33,22 @@ public class OrderController {
 
     /**
      * 주문서 조회 API
-     * 회원 정보 + 장바구니 목록 통합 조회
+     * 회원 정보 + 선택한 장바구니 상품 목록 통합 조회
      */
     @GetMapping("/form")
-    public Response<OrderFormResponse> getOrderForm(@RequestParam String memberNo) {
-        log.info("주문서 조회 요청: memberNo={}", memberNo);
+    public Response<OrderFormResponse> getOrderForm(
+        @RequestParam String memberNo,
+        @RequestParam String cartIdList
+    ) {
+        log.info("주문서 조회 요청: memberNo={}, cartIdList={}", memberNo, cartIdList);
 
-        OrderFormResponse response = orderService.getOrderFormData(memberNo);
+        // 콤마로 구분된 문자열을 List<Long>으로 변환
+        List<Long> cartIds = Arrays.stream(cartIdList.split(","))
+            .map(String::trim)
+            .map(Long::parseLong)
+            .collect(Collectors.toList());
+
+        OrderFormResponse response = orderService.getOrderFormData(memberNo, cartIds);
 
         return new Response<>(response);
     }

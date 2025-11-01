@@ -41,7 +41,7 @@ export default function Header() {
               {isLoggedIn ? (
                 <>
                   <span className="text-sm text-gray-600">
-                    {member?.name}님 (적립금: {member?.points?.toLocaleString()}원)
+                    {member?.name}님
                   </span>
                   <Link
                     href="/orders/history"

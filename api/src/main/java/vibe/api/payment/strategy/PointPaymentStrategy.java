@@ -17,20 +17,25 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * 적립금 결제 전략
+ * 포인트 결제 수단 전략
  *
  * @author Claude
  * @version 1.0
- * @since 2025-10-30
+ * @since 2025-11-01
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class PointStrategy implements PaymentStrategy {
+public class PointPaymentStrategy implements PaymentMethodStrategy {
 
     private final MemberMapper memberMapper;
     private final MemberTrxMapper memberTrxMapper;
     private final OrderMapper orderMapper;
+
+    @Override
+    public boolean supports(String method) {
+        return "POINT".equals(method);
+    }
 
     @Override
     public Payment approve(OrderInfo orderInfo, PaymentInfo paymentInfo) {
@@ -53,7 +58,7 @@ public class PointStrategy implements PaymentStrategy {
         Payment payment = new Payment();
         payment.setOrderNo(orderNo);
         payment.setPaymentType("PAYMENT");
-        payment.setPgType(null);  // 적립금은 PG 없음
+        payment.setPgType("POINT");  // 포인트는 자체 결제 수단
         payment.setPaymentMethod("POINT");
         payment.setPaymentAmount(paymentInfo.getAmount());
         payment.setTid(null);
@@ -61,7 +66,7 @@ public class PointStrategy implements PaymentStrategy {
         payment.setRemainRefundableAmount(paymentInfo.getAmount());
         payment.setPaymentDatetime(LocalDateTime.now());
 
-        log.info("적립금 결제 완료: orderNo={}, memberNo={}, amount={}",
+        log.info("포인트 결제 완료: orderNo={}, memberNo={}, amount={}",
             orderNo, memberNo, paymentInfo.getAmount());
 
         return payment;
@@ -69,14 +74,14 @@ public class PointStrategy implements PaymentStrategy {
 
     @Override
     public void netCancel(Map<String, Object> authResult) {
-        // 적립금은 DB 롤백으로 처리되므로 불필요
-        log.debug("적립금 망취소: DB 롤백으로 처리");
+        // 포인트는 DB 롤백으로 처리되므로 불필요
+        log.debug("포인트 망취소: DB 롤백으로 처리");
     }
 
     @Override
-    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount) {
+    public void refund(Payment payment, Integer cancelAmount, Integer remainAmount) {
         // 1. 주문번호로 회원번호 조회
-        String memberNo = orderMapper.selectMemberNoByOrderNo(orderNo);
+        String memberNo = orderMapper.selectMemberNoByOrderNo(payment.getOrderNo());
         if (memberNo == null) {
             throw new ApiException(ErrorCode.ORDER_NOT_FOUND);
         }
@@ -84,6 +89,7 @@ public class PointStrategy implements PaymentStrategy {
         // 2. 회원 포인트 복구 (환불금액만큼 증가)
         memberTrxMapper.updateMemberPoints(memberNo, cancelAmount);
 
-        log.info("적립금 환불 완료: orderNo={}, memberNo={}, amount={}", orderNo, memberNo, cancelAmount);
+        log.info("포인트 환불 완료: orderNo={}, memberNo={}, amount={}",
+            payment.getOrderNo(), memberNo, cancelAmount);
     }
 }

@@ -33,6 +33,15 @@
            AND PRODUCT_NO = #{productNo}
     </update>
 
+    <!-- 장바구니 수량 변경 (특정 수량으로 설정) -->
+    <update id="updateCartQtyByCartId">
+        UPDATE /* CartTrxMapper.updateCartQtyByCartId */
+               CART
+           SET QTY = #{qty}
+             , UPDATED_AT = NOW()
+         WHERE CART_ID = #{cartId}
+    </update>
+
     <!-- 장바구니 삭제 (여러 개) -->
     <delete id="deleteCartByIds">
         DELETE /* CartTrxMapper.deleteCartByIds */

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
 import { getOrderFormApi, getOrderSequenceApi, getPaymentParamsApi, OrderFormResponse } from '@/api/order'
 
@@ -15,6 +15,7 @@ declare global {
 
 export default function OrderFormPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { isLoggedIn, member } = useAuthStore()
   const [orderFormData, setOrderFormData] = useState<OrderFormResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -28,9 +29,17 @@ export default function OrderFormPage() {
   const fetchOrderForm = async () => {
     if (!member) return
 
+    // URL에서 cartIdList 파라미터 읽기
+    const cartIdList = searchParams.get('cartIdList')
+    if (!cartIdList) {
+      alert('주문할 상품을 선택해주세요.')
+      router.push('/cart')
+      return
+    }
+
     try {
       setLoading(true)
-      const data = await getOrderFormApi(member.memberNo)
+      const data = await getOrderFormApi(member.memberNo, cartIdList)
       setOrderFormData(data)
 
       // 주문번호 채번

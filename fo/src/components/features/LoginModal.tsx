@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import { loginApi } from '@/api/auth'
 import { useAuthStore } from '@/store/authStore'
+import { useModalStore } from '@/store/modalStore'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -18,6 +19,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
   const [error, setError] = useState('')
 
   const { login } = useAuthStore()
+  const { showAlert } = useModalStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,7 +29,7 @@ export default function LoginModal({ isOpen, onClose, onSwitchToRegister }: Logi
     try {
       const member = await loginApi({ loginId, password })
       login(member)
-      alert('로그인 성공!')
+      showAlert('로그인 성공!', 'success')
       onClose()
       setLoginId('')
       setPassword('')

@@ -53,9 +53,9 @@ export interface PaymentParamsResponse {
 /**
  * 주문서 조회 API
  */
-export const getOrderFormApi = async (memberNo: string): Promise<OrderFormResponse> => {
+export const getOrderFormApi = async (memberNo: string, cartIdList: string): Promise<OrderFormResponse> => {
   const response = await axiosInstance.get<ApiResponse<OrderFormResponse>>('/orders/form', {
-    params: { memberNo },
+    params: { memberNo, cartIdList },
   })
   return response.data.payload
 }

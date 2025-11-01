@@ -2,6 +2,7 @@ package vibe.api.service;
 
 import vibe.api.dto.request.AddToCartRequest;
 import vibe.api.dto.request.DeleteCartRequest;
+import vibe.api.dto.request.UpdateCartQtyRequest;
 import vibe.api.dto.response.CartResponse;
 
 import java.util.List;
@@ -23,6 +24,11 @@ public interface CartService {
      * 장바구니 담기
      */
     void addToCart(AddToCartRequest request);
+
+    /**
+     * 장바구니 수량 변경
+     */
+    void updateCartQty(UpdateCartQtyRequest request);
 
     /**
      * 장바구니 삭제

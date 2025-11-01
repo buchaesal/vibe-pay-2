@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Modal from '@/components/ui/Modal'
 import { registerProductApi } from '@/api/product'
+import { useModalStore } from '@/store/modalStore'
 
 interface ProductModalProps {
   isOpen: boolean
@@ -15,6 +16,8 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
   const [price, setPrice] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const { showAlert } = useModalStore()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,7 +37,7 @@ export default function ProductModal({ isOpen, onClose, onSuccess }: ProductModa
         productName,
         price: priceNumber,
       })
-      alert('상품이 등록되었습니다!')
+      showAlert('상품이 등록되었습니다!', 'success')
       setProductName('')
       setPrice('')
       onSuccess()

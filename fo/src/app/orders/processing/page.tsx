@@ -115,6 +115,8 @@ function OrderProcessingContent() {
         merchantData: searchParams.get('merchantData')
       }
 
+      console.log('searchParams', searchParams)
+
       // 결제 정보 구성
       const payments = [
         {

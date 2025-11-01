@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import "./globals.css"
 import Header from "@/components/layout/Header"
 import Footer from "@/components/layout/Footer"
+import GlobalModalProvider from "@/components/providers/GlobalModalProvider"
 
 export const metadata: Metadata = {
   title: "VibePay - 간편한 커머스 사이트",
@@ -21,6 +22,7 @@ export default function RootLayout({
           {children}
         </main>
         <Footer />
+        <GlobalModalProvider />
       </body>
     </html>
   )

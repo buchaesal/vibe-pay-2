@@ -30,8 +30,15 @@ function OrderCompleteContent() {
   const searchParams = useSearchParams()
   const [orderData, setOrderData] = useState<OrderCompleteResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
     const orderNoParam = searchParams.get('orderNo')
     if (!orderNoParam) {
       alert('주문 정보를 찾을 수 없습니다.')
@@ -40,7 +47,7 @@ function OrderCompleteContent() {
     }
 
     fetchOrderComplete(orderNoParam)
-  }, [searchParams, router])
+  }, [mounted, searchParams, router])
 
   const fetchOrderComplete = async (orderNo: string) => {
     try {
@@ -61,7 +68,8 @@ function OrderCompleteContent() {
     }
   }
 
-  if (loading) {
+  // 서버/클라이언트 hydration 일치를 위해 마운트 전에는 로딩 표시
+  if (!mounted || loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center text-gray-600">로딩 중...</div>

@@ -51,13 +51,13 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 주문서 데이터 조회
-     * 회원 정보 + 장바구니 목록 통합 조회
+     * 회원 정보 + 선택한 장바구니 상품 목록 통합 조회
      */
     @Override
-    public OrderFormResponse getOrderFormData(String memberNo) {
-        log.debug("주문서 데이터 조회: memberNo={}", memberNo);
+    public OrderFormResponse getOrderFormData(String memberNo, List<Long> cartIdList) {
+        log.debug("주문서 데이터 조회: memberNo={}, cartIdList={}", memberNo, cartIdList);
 
-        OrderFormResponse response = orderMapper.selectOrderFormData(memberNo);
+        OrderFormResponse response = orderMapper.selectOrderFormData(memberNo, cartIdList);
 
         if (response == null || response.getMemberInfo() == null) {
             throw new ApiException(ErrorCode.MEMBER_NOT_FOUND);
@@ -75,7 +75,7 @@ public class OrderServiceImpl implements OrderService {
         // 사용 가능한 결제수단 설정
         response.setAvailablePayments(Arrays.asList("CARD", "POINT"));
 
-        log.info("주문서 데이터 조회 성공: memberNo={}, totalAmount={}", memberNo, totalAmount);
+        log.info("주문서 데이터 조회 성공: memberNo={}, cartIdList={}, totalAmount={}", memberNo, cartIdList, totalAmount);
 
         return response;
     }

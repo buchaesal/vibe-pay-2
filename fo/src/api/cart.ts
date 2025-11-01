@@ -9,6 +9,14 @@ export interface DeleteCartRequest {
 }
 
 /**
+ * 장바구니 수량 변경 요청 타입
+ */
+export interface UpdateCartQtyRequest {
+  cartId: number
+  qty: number
+}
+
+/**
  * 장바구니 목록 조회 API
  */
 export const getCartListApi = async (memberNo: string): Promise<CartItem[]> => {
@@ -16,6 +24,13 @@ export const getCartListApi = async (memberNo: string): Promise<CartItem[]> => {
     params: { memberNo },
   })
   return response.data.payload
+}
+
+/**
+ * 장바구니 수량 변경 API
+ */
+export const updateCartQtyApi = async (data: UpdateCartQtyRequest): Promise<void> => {
+  await axiosInstance.put<ApiResponse<null>>('/cart/qty', data)
 }
 
 /**

@@ -26,6 +26,11 @@ public interface CartTrxMapper {
     int updateCartQty(@Param("memberNo") String memberNo, @Param("productNo") String productNo);
 
     /**
+     * 장바구니 수량 변경 (특정 수량으로 설정)
+     */
+    int updateCartQtyByCartId(@Param("cartId") Long cartId, @Param("qty") Integer qty);
+
+    /**
      * 장바구니 삭제 (여러 개)
      */
     int deleteCartByIds(@Param("cartIdList") List<Long> cartIdList);

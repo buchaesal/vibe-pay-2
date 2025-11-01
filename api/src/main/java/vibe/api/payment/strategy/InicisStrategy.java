@@ -3,65 +3,45 @@ package vibe.api.payment.strategy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import vibe.api.dto.request.OrderInfo;
-import vibe.api.dto.request.PaymentInfo;
-import vibe.api.entity.Payment;
 import vibe.api.pg.InicisClient;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * 이니시스 결제 전략
+ * 이니시스 PG 전략
  *
  * @author Claude
  * @version 1.0
- * @since 2025-10-30
+ * @since 2025-11-01
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class InicisStrategy implements PaymentStrategy {
+public class InicisStrategy implements PgStrategy {
 
     private final InicisClient inicisClient;
 
     @Override
-    public Payment approve(OrderInfo orderInfo, PaymentInfo paymentInfo) {
+    public boolean supports(String pgType) {
+        return "INICIS".equals(pgType);
+    }
+
+    @Override
+    public Map<String, Object> approve(String orderNo, Long paymentNo, Map<String, Object> authResult) {
         try {
-            String orderNo = orderInfo.getOrderNo();
-            Long paymentNo = paymentInfo.getPaymentNo();
-            Map<String, Object> authResult = paymentInfo.getAuthResult();
-
-            // 1. 이니시스 승인 요청 (로깅은 Client에서 처리)
+            // 이니시스 승인 요청 (로깅은 Client에서 처리)
             Map<String, Object> approvalResult = inicisClient.approve(orderNo, paymentNo, authResult);
-
-            // 2. Payment 객체 생성
-            Payment payment = new Payment();
-            payment.setOrderNo(orderNo);
-            payment.setPaymentType("PAYMENT");
-            payment.setPgType("INICIS");
-            payment.setPaymentMethod("CARD");
-            payment.setPaymentAmount(paymentInfo.getAmount());
-            payment.setTid((String) approvalResult.get("tid"));
-            payment.setApprovalNo((String) approvalResult.get("applNum"));
-            payment.setRemainRefundableAmount(paymentInfo.getAmount());
-            payment.setPaymentDatetime(LocalDateTime.now());
-
-            log.info("이니시스 승인 완료: orderNo={}, tid={}", orderNo, payment.getTid());
-
-            return payment;
+            log.info("이니시스 승인 완료: orderNo={}, tid={}", orderNo, approvalResult.get("tid"));
+            return approvalResult;
 
         } catch (Exception e) {
+            log.error("이니시스 승인 실패", e);
             throw e;
         }
     }
 
     @Override
-    public void netCancel(Map<String, Object> authResult) {
-        // authResult에서 orderNo, paymentNo 추출
-        String orderNo = (String) authResult.get("orderNo");
-        Long paymentNo = authResult.get("paymentNo") != null ? ((Number) authResult.get("paymentNo")).longValue() : null;
-
+    public void netCancel(String orderNo, Long paymentNo, Map<String, Object> authResult) {
         try {
             // 망취소 (로깅은 Client에서 처리)
             inicisClient.netCancel(orderNo, paymentNo, authResult);
@@ -90,5 +70,4 @@ public class InicisStrategy implements PaymentStrategy {
             throw e;
         }
     }
-
 }

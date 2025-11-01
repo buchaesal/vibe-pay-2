@@ -8,6 +8,7 @@ import vibe.api.common.enums.ErrorCode;
 import vibe.api.common.exception.ApiException;
 import vibe.api.dto.request.AddToCartRequest;
 import vibe.api.dto.request.DeleteCartRequest;
+import vibe.api.dto.request.UpdateCartQtyRequest;
 import vibe.api.dto.response.CartResponse;
 import vibe.api.entity.Cart;
 import vibe.api.repository.CartMapper;
@@ -69,6 +70,23 @@ public class CartServiceImpl implements CartService {
 
         log.info("장바구니 담기 성공: memberNo={}, productCount={}",
             request.getMemberNo(), request.getProductNoList().size());
+    }
+
+    /**
+     * 장바구니 수량 변경
+     */
+    @Override
+    @Transactional
+    public void updateCartQty(UpdateCartQtyRequest request) {
+        log.debug("장바구니 수량 변경: cartId={}, qty={}", request.getCartId(), request.getQty());
+
+        int updatedCount = cartTrxMapper.updateCartQtyByCartId(request.getCartId(), request.getQty());
+
+        if (updatedCount == 0) {
+            throw new ApiException(ErrorCode.INVALID_CART_ID);
+        }
+
+        log.info("장바구니 수량 변경 성공: cartId={}, qty={}", request.getCartId(), request.getQty());
     }
 
     /**

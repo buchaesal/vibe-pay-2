@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import { useModalStore } from '@/store/modalStore'
 import { getProductListApi, addToCartApi } from '@/api/product'
 import { Product } from '@/types/api'
 import ProductModal from '@/components/features/ProductModal'
 
 export default function HomePage() {
   const { isLoggedIn, member } = useAuthStore()
+  const { showAlert } = useModalStore()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
@@ -21,7 +23,7 @@ export default function HomePage() {
       setProducts(data)
     } catch (error: any) {
       console.error('상품 목록 조회 실패:', error)
-      alert(error.message ?? '상품 목록을 불러오지 못했습니다.')
+      showAlert(error.message ?? '상품 목록을 불러오지 못했습니다.', 'error')
     } finally {
       setLoading(false)
     }
@@ -43,12 +45,12 @@ export default function HomePage() {
   // 장바구니 담기
   const handleAddToCart = async () => {
     if (!isLoggedIn || !member) {
-      alert('로그인이 필요합니다.')
+      showAlert('로그인이 필요합니다.', 'warning')
       return
     }
 
     if (selectedProducts.length === 0) {
-      alert('상품을 선택해주세요.')
+      showAlert('상품을 선택해주세요.', 'warning')
       return
     }
 
@@ -57,10 +59,10 @@ export default function HomePage() {
         memberNo: member.memberNo,
         productNoList: selectedProducts,
       })
-      alert('장바구니에 담았습니다!')
+      showAlert('장바구니에 담았습니다!', 'success')
       setSelectedProducts([])
     } catch (error: any) {
-      alert(error.message ?? '장바구니 담기에 실패했습니다.')
+      showAlert(error.message ?? '장바구니 담기에 실패했습니다.', 'error')
     }
   }
 

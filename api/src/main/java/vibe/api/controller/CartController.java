@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import vibe.api.common.dto.Response;
 import vibe.api.dto.request.AddToCartRequest;
 import vibe.api.dto.request.DeleteCartRequest;
+import vibe.api.dto.request.UpdateCartQtyRequest;
 import vibe.api.dto.response.CartResponse;
 import vibe.api.service.CartService;
 
@@ -54,6 +55,18 @@ public class CartController {
             request.getMemberNo(), request.getProductNoList().size());
 
         cartService.addToCart(request);
+
+        return new Response<>();
+    }
+
+    /**
+     * 장바구니 수량 변경 API
+     */
+    @PutMapping("/qty")
+    public Response<Void> updateCartQty(@RequestBody @Valid UpdateCartQtyRequest request) {
+        log.info("장바구니 수량 변경 요청: cartId={}, qty={}", request.getCartId(), request.getQty());
+
+        cartService.updateCartQty(request);
 
         return new Response<>();
     }

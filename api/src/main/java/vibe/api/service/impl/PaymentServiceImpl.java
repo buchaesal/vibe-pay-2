@@ -11,10 +11,8 @@ import vibe.api.dto.request.OrderInfo;
 import vibe.api.dto.request.PaymentInfo;
 import vibe.api.dto.response.PaymentParamsResponse;
 import vibe.api.entity.Payment;
-import vibe.api.payment.strategy.InicisStrategy;
-import vibe.api.payment.strategy.PaymentStrategy;
-import vibe.api.payment.strategy.PointStrategy;
-import vibe.api.payment.strategy.TossStrategy;
+import vibe.api.payment.strategy.PaymentMethodStrategy;
+import vibe.api.payment.strategy.PgStrategy;
 import vibe.api.pg.InicisClient;
 import vibe.api.repository.PaymentMapper;
 import vibe.api.repository.PaymentTrxMapper;
@@ -39,9 +37,8 @@ import java.util.Map;
 public class PaymentServiceImpl implements PaymentService {
 
     private final InicisClient inicisClient;
-    private final InicisStrategy inicisStrategy;
-    private final TossStrategy tossStrategy;
-    private final PointStrategy pointStrategy;
+    private final List<PaymentMethodStrategy> paymentMethodStrategies;
+    private final List<PgStrategy> pgStrategies;
     private final PaymentMapper paymentMapper;
     private final PaymentTrxMapper paymentTrxMapper;
 
@@ -102,7 +99,7 @@ public class PaymentServiceImpl implements PaymentService {
         log.debug("결제 승인 시도: paymentNo={}, pgType={}, method={}, amount={}",
             paymentNo, paymentInfo.getPgType(), paymentInfo.getMethod(), paymentInfo.getAmount());
 
-        PaymentStrategy strategy = getPaymentStrategy(paymentInfo);
+        PaymentMethodStrategy strategy = getPaymentMethodStrategy(paymentInfo.getMethod());
         Payment payment = strategy.approve(orderInfo, paymentInfo);
 
         payment.setPaymentNo(paymentNo);
@@ -123,6 +120,7 @@ public class PaymentServiceImpl implements PaymentService {
         );
         authResult.put("orderNo", orderNo);
         authResult.put("paymentNo", paymentNo);
+        authResult.put("pgType", paymentInfo.getPgType());
         return authResult;
     }
 
@@ -133,7 +131,7 @@ public class PaymentServiceImpl implements PaymentService {
         for (int i = 0; i < authResults.size(); i++) {
             try {
                 PaymentInfo paymentInfo = payments.get(i);
-                PaymentStrategy strategy = getPaymentStrategy(paymentInfo);
+                PaymentMethodStrategy strategy = getPaymentMethodStrategy(paymentInfo.getMethod());
 
                 log.warn("망취소 시도: method={}", paymentInfo.getMethod());
                 strategy.netCancel(authResults.get(i));
@@ -145,18 +143,24 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * 전략 선택
+     * 결제 수단 전략 찾기 (if 분기 없이)
      */
-    private PaymentStrategy getPaymentStrategy(PaymentInfo paymentInfo) {
-        if ("POINT".equals(paymentInfo.getMethod())) {
-            return pointStrategy;
-        } else if ("INICIS".equals(paymentInfo.getPgType())) {
-            return inicisStrategy;
-        } else if ("TOSS".equals(paymentInfo.getPgType())) {
-            return tossStrategy;
-        }
 
-        throw new IllegalArgumentException("Unknown payment method: " + paymentInfo.getMethod());
+    private PaymentMethodStrategy getPaymentMethodStrategy(String method) {
+        return paymentMethodStrategies.stream()
+            .filter(strategy -> strategy.supports(method))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Unknown payment method: " + method));
+    }
+
+    /**
+     * PG 전략 찾기 (if 분기 없이)
+     */
+    private PgStrategy getPgStrategy(String pgType) {
+        return pgStrategies.stream()
+            .filter(strategy -> strategy.supports(pgType))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Unknown PG type: " + pgType));
     }
 
     /**
@@ -220,9 +224,9 @@ public class PaymentServiceImpl implements PaymentService {
         log.debug("{} 취소: paymentNo={}, refundAmount={}, newRemainAmount={}",
             payment.getPaymentMethod(), payment.getPaymentNo(), refundAmount, newRemainAmount);
 
-        // 전략 패턴으로 환불 처리
-        PaymentStrategy strategy = getPaymentStrategyByPgType(payment.getPgType());
-        strategy.refund(payment.getOrderNo(), payment.getPaymentNo(), payment.getTid(), refundAmount, newRemainAmount);
+        // 결제 수단 전략으로 환불 처리 (카드는 내부에서 PG 전략 사용, 포인트는 직접 처리)
+        PaymentMethodStrategy strategy = getPaymentMethodStrategy(payment.getPaymentMethod());
+        strategy.refund(payment, refundAmount, newRemainAmount);
 
         // 환불 기록 저장
         Payment refundPayment = createRefundPayment(payment, refundAmount);
@@ -256,20 +260,5 @@ public class PaymentServiceImpl implements PaymentService {
         if (remainAmount > 0) {
             throw new ApiException(ErrorCode.CANCEL_FAIL);
         }
-    }
-
-    /**
-     * PG 타입으로 전략 선택
-     */
-    private PaymentStrategy getPaymentStrategyByPgType(String pgType) {
-        if ("INICIS".equals(pgType)) {
-            return inicisStrategy;
-        } else if ("TOSS".equals(pgType)) {
-            return tossStrategy;
-        } else if ("POINT".equals(pgType)) {
-            return pointStrategy;
-        }
-
-        throw new IllegalArgumentException("Unknown PG type: " + pgType);
     }
 }

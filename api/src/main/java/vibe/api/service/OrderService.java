@@ -22,7 +22,7 @@ public interface OrderService {
     /**
      * 주문서 데이터 조회
      */
-    OrderFormResponse getOrderFormData(String memberNo);
+    OrderFormResponse getOrderFormData(String memberNo, List<Long> cartIdList);
 
     /**
      * 주문번호 채번

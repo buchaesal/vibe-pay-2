@@ -19,9 +19,9 @@ import java.util.List;
 @Mapper
 public interface OrderMapper {
     /**
-     * 주문서 데이터 조회 (회원 정보 + 장바구니 리스트)
+     * 주문서 데이터 조회 (회원 정보 + 선택한 장바구니 리스트)
      */
-    OrderFormResponse selectOrderFormData(@Param("memberNo") String memberNo);
+    OrderFormResponse selectOrderFormData(@Param("memberNo") String memberNo, @Param("cartIdList") List<Long> cartIdList);
 
     /**
      * 주문번호 채번

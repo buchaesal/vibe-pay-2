@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import vibe.api.common.config.PaymentProperties;
 import vibe.api.common.enums.ErrorCode;
@@ -93,25 +96,23 @@ public class InicisClient {
             String verification = sha256(verificationData);
 
             // 승인 요청 파라미터
-            Map<String, String> params = Map.of(
-                "mid", config.getMid(),
-                "authToken", authToken,
-                "timestamp", timestampStr,
-                "signature", signature,
-                "verification", verification,
-                "charset", "UTF-8",
-                "format", "JSON"
-            );
+            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("mid", config.getMid());
+            formData.add("authToken", authToken);
+            formData.add("timestamp", timestampStr);
+            formData.add("signature", signature);
+            formData.add("verification", verification);
+            formData.add("charset", "UTF-8");
+            formData.add("format", "JSON");
 
             // 1. 요청 로그 저장 (트랜잭션 분리)
-            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "APPROVAL", orderNo, paymentNo, params);
+            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "APPROVAL", orderNo, paymentNo, formData.toSingleValueMap());
 
             // 2. WebClient로 승인 요청
             WebClient webClient = webClientBuilder.baseUrl(authUrl).build();
 
             String response = webClient.post()
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .bodyValue(buildFormData(params))
+                .body(BodyInserters.fromFormData(formData))
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
@@ -292,25 +293,23 @@ public class InicisClient {
                 authToken, config.getSignKey(), timestampStr);
             String verification = sha256(verificationData);
 
-            Map<String, String> params = Map.of(
-                "mid", config.getMid(),
-                "authToken", authToken,
-                "timestamp", timestampStr,
-                "signature", signature,
-                "verification", verification,
-                "charset", "UTF-8",
-                "format", "JSON"
-            );
+            MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("mid", config.getMid());
+            formData.add("authToken", authToken);
+            formData.add("timestamp", timestampStr);
+            formData.add("signature", signature);
+            formData.add("verification", verification);
+            formData.add("charset", "UTF-8");
+            formData.add("format", "JSON");
 
             // 1. 요청 로그 저장 (트랜잭션 분리)
-            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "NET_CANCEL", orderNo, paymentNo, params);
+            interfaceSeq = paymentInterfaceService.saveRequest("INICIS", "NET_CANCEL", orderNo, paymentNo, formData.toSingleValueMap());
 
             // 2. WebClient로 망취소 요청
             WebClient webClient = webClientBuilder.baseUrl(netCancelUrl).build();
 
             String response = webClient.post()
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .bodyValue(buildFormData(params))
+                .body(BodyInserters.fromFormData(formData))
                 .retrieve()
                 .bodyToMono(String.class)
                 .block();
@@ -352,12 +351,5 @@ public class InicisClient {
             result.append(String.format("%02x", b));
         }
         return result.toString();
-    }
-
-    private String buildFormData(Map<String, String> params) {
-        return params.entrySet().stream()
-            .map(entry -> entry.getKey() + "=" + entry.getValue())
-            .reduce((a, b) -> a + "&" + b)
-            .orElse("");
     }
 }
