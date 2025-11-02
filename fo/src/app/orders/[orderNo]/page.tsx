@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { useModalStore } from '@/store/modalStore'
 import axiosInstance from '@/api/axios'
 import { ApiResponse, OrderDetailResponse, OrderCancelRequest } from '@/types/api'
 
@@ -11,6 +12,7 @@ export default function OrderDetailPage() {
   const params = useParams()
   const orderNo = params.orderNo as string
   const { isLoggedIn } = useAuthStore()
+  const { showAlert, showConfirm } = useModalStore()
 
   const [orderData, setOrderData] = useState<OrderDetailResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -20,8 +22,7 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (!isLoggedIn) {
-      alert('로그인이 필요합니다.')
-      router.push('/')
+      showAlert('로그인이 필요합니다.', 'warning', () => router.push('/'))
       return
     }
 
@@ -37,8 +38,7 @@ export default function OrderDetailPage() {
       setOrderData(response.data.payload)
     } catch (error: any) {
       console.error('주문 상세 조회 실패:', error)
-      alert(error.message ?? '주문 상세를 불러오지 못했습니다.')
-      router.push('/orders/history')
+      showAlert(error.message ?? '주문 상세를 불러오지 못했습니다.', 'error', () => router.push('/orders/history'))
     } finally {
       setLoading(false)
     }
@@ -47,7 +47,7 @@ export default function OrderDetailPage() {
   const handleCancelClick = (orderSeq: number, qty: number, cancelQty: number) => {
     const maxQty = qty - cancelQty
     if (maxQty <= 0) {
-      alert('취소 가능한 수량이 없습니다.')
+      showAlert('취소 가능한 수량이 없습니다.', 'warning')
       return
     }
     setSelectedItem({ orderSeq, maxQty })
@@ -58,32 +58,30 @@ export default function OrderDetailPage() {
     if (!selectedItem) return
 
     if (cancelQty <= 0 || cancelQty > selectedItem.maxQty) {
-      alert(`취소 수량은 1개 이상 ${selectedItem.maxQty}개 이하로 입력해주세요.`)
+      showAlert(`취소 수량은 1개 이상 ${selectedItem.maxQty}개 이하로 입력해주세요.`, 'warning')
       return
     }
 
-    if (!confirm(`${cancelQty}개를 취소하시겠습니까?`)) {
-      return
-    }
-
-    try {
-      setCancelling(true)
-      const request: OrderCancelRequest = {
-        orderNo,
-        orderSeq: selectedItem.orderSeq,
-        cancelQty
+    showConfirm(`${cancelQty}개를 취소하시겠습니까?`, async () => {
+      try {
+        setCancelling(true)
+        const request: OrderCancelRequest = {
+          orderNo,
+          orderSeq: selectedItem.orderSeq,
+          cancelQty
+        }
+        await axiosInstance.post<ApiResponse<void>>('/orders/cancel', request)
+        showAlert('주문이 취소되었습니다.', 'success')
+        setSelectedItem(null)
+        setCancelQty(1)
+        await fetchOrderDetail()
+      } catch (error: any) {
+        console.error('주문 취소 실패:', error)
+        showAlert(error.message ?? '주문 취소에 실패했습니다.', 'error')
+      } finally {
+        setCancelling(false)
       }
-      await axiosInstance.post<ApiResponse<void>>('/orders/cancel', request)
-      alert('주문이 취소되었습니다.')
-      setSelectedItem(null)
-      setCancelQty(1)
-      await fetchOrderDetail()
-    } catch (error: any) {
-      console.error('주문 취소 실패:', error)
-      alert(error.message ?? '주문 취소에 실패했습니다.')
-    } finally {
-      setCancelling(false)
-    }
+    })
   }
 
   if (loading) {
@@ -120,25 +118,23 @@ export default function OrderDetailPage() {
 
   // 전체취소 처리
   const handleFullCancel = async () => {
-    if (!confirm('모든 상품을 취소하시겠습니까?')) {
-      return
-    }
-
-    try {
-      setCancelling(true)
-      const request: OrderCancelRequest = {
-        orderNo,
-        isFullCancel: true
+    showConfirm('모든 상품을 취소하시겠습니까?', async () => {
+      try {
+        setCancelling(true)
+        const request: OrderCancelRequest = {
+          orderNo,
+          isFullCancel: true
+        }
+        await axiosInstance.post<ApiResponse<void>>('/orders/cancel', request)
+        showAlert('주문이 전체 취소되었습니다.', 'success')
+        await fetchOrderDetail()
+      } catch (error: any) {
+        console.error('전체 취소 실패:', error)
+        showAlert(error.message ?? '전체 취소에 실패했습니다.', 'error')
+      } finally {
+        setCancelling(false)
       }
-      await axiosInstance.post<ApiResponse<void>>('/orders/cancel', request)
-      alert('주문이 전체 취소되었습니다.')
-      await fetchOrderDetail()
-    } catch (error: any) {
-      console.error('전체 취소 실패:', error)
-      alert(error.message ?? '전체 취소에 실패했습니다.')
-    } finally {
-      setCancelling(false)
-    }
+    })
   }
 
   return (

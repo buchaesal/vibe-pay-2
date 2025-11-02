@@ -54,4 +54,14 @@ public interface OrderMapper {
      * 주문번호로 회원번호 조회
      */
     String selectMemberNoByOrderNo(@Param("orderNo") String orderNo);
+
+    /**
+     * 주문의 최대 processSeq 조회
+     */
+    Integer selectMaxProcessSeq(@Param("orderNo") String orderNo);
+
+    /**
+     * 특정 상품(orderSeq)의 최대 processSeq 조회
+     */
+    Integer selectMaxProcessSeqByOrderSeq(@Param("orderNo") String orderNo, @Param("orderSeq") Integer orderSeq);
 }

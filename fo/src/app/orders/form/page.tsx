@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { useModalStore } from '@/store/modalStore'
 import { getOrderFormApi, getOrderSequenceApi, getPaymentParamsApi, OrderFormResponse } from '@/api/order'
 
 // PG 타입 선언
@@ -17,6 +18,7 @@ export default function OrderFormPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isLoggedIn, member } = useAuthStore()
+  const { showAlert } = useModalStore()
   const [orderFormData, setOrderFormData] = useState<OrderFormResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [orderNo, setOrderNo] = useState<string>('')
@@ -32,8 +34,7 @@ export default function OrderFormPage() {
     // URL에서 cartIdList 파라미터 읽기
     const cartIdList = searchParams.get('cartIdList')
     if (!cartIdList) {
-      alert('주문할 상품을 선택해주세요.')
-      router.push('/cart')
+      showAlert('주문할 상품을 선택해주세요.', 'warning', () => router.push('/cart'))
       return
     }
 
@@ -47,8 +48,7 @@ export default function OrderFormPage() {
       setOrderNo(sequenceData.orderNo)
     } catch (error: any) {
       console.error('주문서 조회 실패:', error)
-      alert(error.message ?? '주문서를 불러오지 못했습니다.')
-      router.push('/cart')
+      showAlert(error.message ?? '주문서를 불러오지 못했습니다.', 'error', () => router.push('/cart'))
     } finally {
       setLoading(false)
     }
@@ -56,8 +56,7 @@ export default function OrderFormPage() {
 
   useEffect(() => {
     if (!isLoggedIn || !member) {
-      alert('로그인이 필요합니다.')
-      router.push('/')
+      showAlert('로그인이 필요합니다.', 'warning', () => router.push('/'))
       return
     }
 
@@ -67,12 +66,12 @@ export default function OrderFormPage() {
   // 결제하기
   const handlePayment = async () => {
     if (!orderFormData || orderFormData.cartList.length === 0) {
-      alert('주문할 상품이 없습니다.')
+      showAlert('주문할 상품이 없습니다.', 'warning')
       return
     }
 
     if (!member) {
-      alert('로그인이 필요합니다.')
+      showAlert('로그인이 필요합니다.', 'warning')
       return
     }
 
@@ -106,7 +105,7 @@ export default function OrderFormPage() {
         router.push('/orders/processing')
       } catch (error) {
         console.error('적립금 결제 실패:', error)
-        alert('결제 처리 중 오류가 발생했습니다.')
+        showAlert('결제 처리 중 오류가 발생했습니다.', 'error')
       }
       return
     }
@@ -140,7 +139,7 @@ export default function OrderFormPage() {
         await handleTossPayment(cardAmount)
       }
     } else {
-      alert('결제 금액을 확인해주세요.')
+      showAlert('결제 금액을 확인해주세요.', 'warning')
     }
   }
 
@@ -224,7 +223,7 @@ export default function OrderFormPage() {
 
     } catch (error: any) {
       console.error('이니시스 결제 실패:', error)
-      alert(error.message ?? '결제 처리 중 오류가 발생했습니다.')
+      showAlert(error.message ?? '결제 처리 중 오류가 발생했습니다.', 'error')
     }
   }
 
@@ -289,7 +288,7 @@ export default function OrderFormPage() {
 
     } catch (error: any) {
       console.error('토스 결제 실패:', error)
-      alert(error.message ?? '결제 처리 중 오류가 발생했습니다.')
+      showAlert(error.message ?? '결제 처리 중 오류가 발생했습니다.', 'error')
     }
   }
 

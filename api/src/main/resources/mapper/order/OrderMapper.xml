@@ -201,4 +201,21 @@
          WHERE ORDER_NO = #{orderNo}
     </select>
 
+    <!-- 주문의 최대 processSeq 조회 -->
+    <select id="selectMaxProcessSeq" resultType="int">
+        SELECT /* OrderMapper.selectMaxProcessSeq */
+               COALESCE(MAX(PROCESS_SEQ), 0)
+          FROM ORDER_DETAIL
+         WHERE ORDER_NO = #{orderNo}
+    </select>
+
+    <!-- 특정 상품(orderSeq)의 최대 processSeq 조회 -->
+    <select id="selectMaxProcessSeqByOrderSeq" resultType="int">
+        SELECT /* OrderMapper.selectMaxProcessSeqByOrderSeq */
+               COALESCE(MAX(PROCESS_SEQ), 0)
+          FROM ORDER_DETAIL
+         WHERE ORDER_NO = #{orderNo}
+           AND ORDER_SEQ = #{orderSeq}
+    </select>
+
 </mapper>

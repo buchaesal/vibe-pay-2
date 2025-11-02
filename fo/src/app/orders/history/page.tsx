@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { useModalStore } from '@/store/modalStore'
 import axiosInstance from '@/api/axios'
 import { ApiResponse } from '@/types/api'
 
@@ -26,13 +27,13 @@ interface OrderHistoryResponse {
 export default function OrderHistoryPage() {
   const router = useRouter()
   const { isLoggedIn, member } = useAuthStore()
+  const { showAlert } = useModalStore()
   const [orders, setOrders] = useState<OrderHistoryResponse[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoggedIn || !member) {
-      alert('로그인이 필요합니다.')
-      router.push('/')
+      showAlert('로그인이 필요합니다.', 'warning', () => router.push('/'))
       return
     }
 
@@ -53,7 +54,7 @@ export default function OrderHistoryPage() {
       setOrders(response.data.payload)
     } catch (error: any) {
       console.error('주문 내역 조회 실패:', error)
-      alert(error.message ?? '주문 내역을 불러오지 못했습니다.')
+      showAlert(error.message ?? '주문 내역을 불러오지 못했습니다.', 'error')
     } finally {
       setLoading(false)
     }

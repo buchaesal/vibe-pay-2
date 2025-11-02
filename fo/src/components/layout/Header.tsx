@@ -37,27 +37,29 @@ export default function Header() {
             </Link>
 
             {/* 네비게이션 */}
-            <nav className="flex items-center gap-4">
+            <nav className="flex items-center gap-1">
               {isLoggedIn ? (
                 <>
-                  <span className="text-sm text-gray-600">
+                  <span className="px-3 py-2 text-sm font-medium text-gray-700">
                     {member?.name}님
                   </span>
+                  <div className="w-px h-4 bg-gray-300 mx-1"></div>
                   <Link
                     href="/orders/history"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                    className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md transition"
                   >
                     주문내역
                   </Link>
                   <Link
                     href="/cart"
-                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                    className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md transition"
                   >
                     장바구니
                   </Link>
+                  <div className="w-px h-4 bg-gray-300 mx-1"></div>
                   <button
                     onClick={handleLogout}
-                    className="px-4 py-2 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700"
+                    className="px-4 py-2 text-sm font-medium text-white bg-gray-600 rounded-md hover:bg-gray-700 transition ml-1"
                   >
                     로그아웃
                   </button>
@@ -66,13 +68,13 @@ export default function Header() {
                 <>
                   <button
                     onClick={() => setShowLoginModal(true)}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md transition"
                   >
                     로그인
                   </button>
                   <button
                     onClick={() => setShowRegisterModal(true)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition"
                   >
                     회원가입
                   </button>

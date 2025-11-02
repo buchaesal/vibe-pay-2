@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import axiosInstance from '@/api/axios'
 import { ApiResponse } from '@/types/api'
+import { useModalStore } from '@/store/modalStore'
 
 interface OrderCompleteItem {
   productName: string
@@ -28,6 +29,7 @@ interface OrderCompleteResponse {
 function OrderCompleteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showAlert } = useModalStore()
   const [orderData, setOrderData] = useState<OrderCompleteResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -41,8 +43,7 @@ function OrderCompleteContent() {
 
     const orderNoParam = searchParams.get('orderNo')
     if (!orderNoParam) {
-      alert('주문 정보를 찾을 수 없습니다.')
-      router.push('/')
+      showAlert('주문 정보를 찾을 수 없습니다.', 'error', () => router.push('/'))
       return
     }
 
@@ -61,8 +62,7 @@ function OrderCompleteContent() {
       setOrderData(response.data.payload)
     } catch (error: any) {
       console.error('주문 완료 조회 실패:', error)
-      alert(error.message ?? '주문 정보를 불러오지 못했습니다.')
-      router.push('/')
+      showAlert(error.message ?? '주문 정보를 불러오지 못했습니다.', 'error', () => router.push('/'))
     } finally {
       setLoading(false)
     }

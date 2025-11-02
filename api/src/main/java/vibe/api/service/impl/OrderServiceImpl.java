@@ -177,11 +177,13 @@ public class OrderServiceImpl implements OrderService {
      */
     private void createOrderDetails(List<CartResponse> cartItems, String orderNo, LocalDateTime orderDatetime) {
         int orderSeq = 1;
+        int processSeq = 1;  // 주문 시에는 모든 상품이 같은 processSeq
+
         for (CartResponse cart : cartItems) {
             OrderDetail orderDetail = new OrderDetail();
             orderDetail.setOrderNo(orderNo);
             orderDetail.setOrderSeq(orderSeq);
-            orderDetail.setProcessSeq(orderSeq);
+            orderDetail.setProcessSeq(processSeq);  // 모두 1
             orderDetail.setParentProcessSeq(null);
             orderDetail.setClaimNo(null);
             orderDetail.setProductNo(cart.getProductNo());
@@ -194,7 +196,7 @@ public class OrderServiceImpl implements OrderService {
             orderTrxMapper.insertOrderDetail(orderDetail);
             orderSeq++;
         }
-        log.debug("ORDER_DETAIL 생성 완료: count={}", cartItems.size());
+        log.debug("ORDER_DETAIL 생성 완료: count={}, processSeq={}", cartItems.size(), processSeq);
     }
 
     /**
@@ -312,9 +314,10 @@ public class OrderServiceImpl implements OrderService {
             throw new ApiException(ErrorCode.CANCEL_FAIL);
         }
 
-        // 4. 총 취소 금액 계산
+        // 4. 총 취소 금액 계산 및 processSeq 결정
         Integer totalCancelAmount = 0;
-        int processSeq = orderDetail.getItems().size() + 1;
+        // 전체 취소는 모든 상품이 같은 processSeq를 가짐 (주문 전체의 최대 processSeq + 1)
+        int processSeq = orderMapper.selectMaxProcessSeq(orderNo) + 1;
 
         // 5. 각 상품별 취소 처리
         for (OrderDetailResponse.OrderDetailItem item : cancellableItems) {
@@ -326,8 +329,8 @@ public class OrderServiceImpl implements OrderService {
             OrderDetail cancelDetail = new OrderDetail();
             cancelDetail.setOrderNo(orderNo);
             cancelDetail.setOrderSeq(item.getOrderSeq());
-            cancelDetail.setProcessSeq(processSeq++);
-            cancelDetail.setParentProcessSeq(item.getOrderSeq());
+            cancelDetail.setProcessSeq(processSeq);  // 모두 같은 값
+            cancelDetail.setParentProcessSeq(1);  // 전체 취소는 항상 주문(process_seq=1)을 상위로 참조
             cancelDetail.setClaimNo(claimNo);
             cancelDetail.setProductNo(item.getProductNo());
             cancelDetail.setOrderType("CANCEL");
@@ -384,19 +387,23 @@ public class OrderServiceImpl implements OrderService {
         // 5. 취소 금액 계산
         Integer cancelAmount = targetItem.getPrice() * cancelQty;
 
-        // 6. 취소 주문 상세 INSERT
+        // 6. 해당 상품(orderSeq)의 processSeq 결정
+        // 부분 취소는 해당 상품의 최대 processSeq + 1
+        int processSeq = orderMapper.selectMaxProcessSeqByOrderSeq(orderNo, orderSeq) + 1;
+
+        // 7. 취소 주문 상세 INSERT
         OrderDetail cancelDetail = new OrderDetail();
         cancelDetail.setOrderNo(orderNo);
         cancelDetail.setOrderSeq(orderSeq);
-        cancelDetail.setProcessSeq(orderDetail.getItems().size() + 1);  // 새로운 processSeq
-        cancelDetail.setParentProcessSeq(orderSeq);
+        cancelDetail.setProcessSeq(processSeq);  // 해당 상품의 다음 processSeq
+        cancelDetail.setParentProcessSeq(processSeq - 1);  // 부분 취소는 직전 처리를 상위로 참조
         cancelDetail.setClaimNo(claimNo);
         cancelDetail.setProductNo(targetItem.getProductNo());
         cancelDetail.setOrderType("CANCEL");
         cancelDetail.setOrderDatetime(LocalDateTime.now());
         cancelDetail.setCompleteDatetime(LocalDateTime.now());
-        cancelDetail.setOrderQty(0);
-        cancelDetail.setCancelQty(cancelQty);
+        cancelDetail.setOrderQty(cancelQty);  // 취소 수량을 order_qty에
+        cancelDetail.setCancelQty(0);  // cancel_qty는 0
 
         orderTrxMapper.insertOrderDetail(cancelDetail);
 
