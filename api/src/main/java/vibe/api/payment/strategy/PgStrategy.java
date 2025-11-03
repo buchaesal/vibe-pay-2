@@ -49,6 +49,7 @@ public interface PgStrategy {
      * @param tid 거래ID
      * @param cancelAmount 취소금액
      * @param remainAmount 잔여금액
+     * @param originalAmount 원결제금액
      */
-    void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount);
+    void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount, Integer originalAmount);
 }

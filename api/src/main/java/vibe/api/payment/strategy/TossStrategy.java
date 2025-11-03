@@ -52,12 +52,15 @@ public class TossStrategy implements PgStrategy {
     }
 
     @Override
-    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount) {
+    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount, Integer originalAmount) {
         try {
             // 토스는 전체/부분 취소 API 동일 (로깅은 Client에서 처리)
             tossClient.refund(orderNo, paymentNo, tid, cancelAmount);
 
-            log.info("토스 취소 완료: paymentKey={}, amount={}", tid, cancelAmount);
+            // 전체 취소 vs 부분 취소 로그 구분
+            boolean isFullCancel = originalAmount.equals(cancelAmount);
+            log.info("토스 취소 완료: paymentKey={}, amount={}, type={}",
+                tid, cancelAmount, isFullCancel ? "전체취소" : "부분취소");
 
         } catch (Exception e) {
             log.error("토스 취소 실패", e);

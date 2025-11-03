@@ -397,7 +397,7 @@ public class OrderServiceImpl implements OrderService {
         cancelDetail.setOrderNo(orderNo);
         cancelDetail.setOrderSeq(orderSeq);
         cancelDetail.setProcessSeq(processSeq);  // 해당 상품의 다음 processSeq
-        cancelDetail.setParentProcessSeq(processSeq - 1);  // 부분 취소는 직전 처리를 상위로 참조
+        cancelDetail.setParentProcessSeq(1);  // 부분 취소도 항상 원주문(process_seq=1)을 상위로 참조
         cancelDetail.setClaimNo(claimNo);
         cancelDetail.setProductNo(targetItem.getProductNo());
         cancelDetail.setOrderType("CANCEL");

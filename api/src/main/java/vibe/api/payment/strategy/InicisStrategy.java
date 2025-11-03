@@ -52,10 +52,13 @@ public class InicisStrategy implements PgStrategy {
     }
 
     @Override
-    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount) {
+    public void refund(String orderNo, Long paymentNo, String tid, Integer cancelAmount, Integer remainAmount, Integer originalAmount) {
         try {
             // 전체 취소 vs 부분 취소 판단
-            if (remainAmount == 0) {
+            // 원결제금액 == 취소금액 이면 전체취소 (부분취소 이력 무관)
+            boolean isFullCancel = originalAmount.equals(cancelAmount);
+
+            if (isFullCancel) {
                 // 전체 취소 (로깅은 Client에서 처리)
                 inicisClient.refund(orderNo, paymentNo, tid);
             } else {
@@ -63,7 +66,8 @@ public class InicisStrategy implements PgStrategy {
                 inicisClient.partialRefund(orderNo, paymentNo, tid, cancelAmount, remainAmount);
             }
 
-            log.info("이니시스 취소 완료: tid={}, amount={}", tid, cancelAmount);
+            log.info("이니시스 취소 완료: tid={}, amount={}, type={}",
+                tid, cancelAmount, isFullCancel ? "전체취소" : "부분취소");
 
         } catch (Exception e) {
             log.error("이니시스 취소 실패", e);

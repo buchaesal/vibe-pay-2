@@ -140,9 +140,9 @@ public class CardPaymentStrategy implements PaymentMethodStrategy {
             // PG 전략 찾기
             PgStrategy pgStrategy = findPgStrategy(pgType);
 
-            // PG 환불 요청
+            // PG 환불 요청 (원결제금액 전달)
             pgStrategy.refund(payment.getOrderNo(), payment.getPaymentNo(), payment.getTid(),
-                cancelAmount, remainAmount);
+                cancelAmount, remainAmount, payment.getPaymentAmount());
 
             log.info("카드 결제 환불 완료: orderNo={}, pgType={}, tid={}, amount={}",
                 payment.getOrderNo(), pgType, payment.getTid(), cancelAmount);
