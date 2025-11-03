@@ -13,6 +13,7 @@ import vibe.api.service.PaymentInterfaceService;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 토스페이먼츠 PG 클라이언트
@@ -140,7 +141,8 @@ public class TossClient {
             paymentInterfaceService.updateResponse(interfaceSeq, result, resultCode);
 
             // 취소 성공 확인 (status = CANCELED)
-            if (!"CANCELED".equals(status)) {
+            Set<String> successStatuses = Set.of("CANCELED", "PARTIAL_CANCELED");
+            if (!successStatuses.contains(status)) {
                 log.error("토스 취소 실패: {}", result);
                 throw new ApiException(ErrorCode.CANCEL_FAIL);
             }

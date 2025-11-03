@@ -10,11 +10,19 @@ export interface ProductRegisterRequest {
 }
 
 /**
+ * 장바구니 아이템 (상품번호 + 수량)
+ */
+export interface CartItemRequest {
+  productNo: string
+  qty: number
+}
+
+/**
  * 장바구니 담기 요청 타입
  */
 export interface AddToCartRequest {
   memberNo: string
-  productNoList: string[]
+  items: CartItemRequest[]
 }
 
 /**

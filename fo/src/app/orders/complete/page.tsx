@@ -3,8 +3,9 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import axiosInstance from '@/api/axios'
-import { ApiResponse } from '@/types/api'
+import { ApiResponse, Member } from '@/types/api'
 import { useModalStore } from '@/store/modalStore'
+import { useAuthStore } from '@/store/authStore'
 
 interface OrderCompleteItem {
   productName: string
@@ -30,6 +31,7 @@ function OrderCompleteContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showAlert } = useModalStore()
+  const { member, updateMember } = useAuthStore()
   const [orderData, setOrderData] = useState<OrderCompleteResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
@@ -60,11 +62,28 @@ function OrderCompleteContent() {
         }
       )
       setOrderData(response.data.payload)
+
+      // 회원정보 갱신 (적립금 업데이트)
+      if (member?.memberNo) {
+        await refreshMemberInfo(member.memberNo)
+      }
     } catch (error: any) {
       console.error('주문 완료 조회 실패:', error)
       showAlert(error.message ?? '주문 정보를 불러오지 못했습니다.', 'error', () => router.push('/'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshMemberInfo = async (memberNo: string) => {
+    try {
+      const response = await axiosInstance.get<ApiResponse<Member>>(
+        `/members/${memberNo}`
+      )
+      updateMember(response.data.payload)
+    } catch (error: any) {
+      console.error('회원정보 갱신 실패:', error)
+      // 회원정보 갱신 실패는 치명적이지 않으므로 에러 알림 없이 로그만 남김
     }
   }
 

@@ -52,7 +52,7 @@ public class CartController {
     @PostMapping
     public Response<Void> addToCart(@RequestBody @Valid AddToCartRequest request) {
         log.info("장바구니 담기 요청: memberNo={}, productCount={}",
-            request.getMemberNo(), request.getProductNoList().size());
+            request.getMemberNo(), request.getItems().size());
 
         cartService.addToCart(request);
 

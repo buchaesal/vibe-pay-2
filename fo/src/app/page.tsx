@@ -7,10 +7,14 @@ import { getProductListApi, addToCartApi } from '@/api/product'
 import { Product } from '@/types/api'
 import ProductModal from '@/components/features/ProductModal'
 
+interface ProductWithQty extends Product {
+  selectedQty: number
+}
+
 export default function HomePage() {
   const { isLoggedIn, member } = useAuthStore()
   const { showAlert } = useModalStore()
-  const [products, setProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<ProductWithQty[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [showProductModal, setShowProductModal] = useState(false)
@@ -20,7 +24,8 @@ export default function HomePage() {
     try {
       setLoading(true)
       const data = await getProductListApi()
-      setProducts(data)
+      // 각 상품에 기본 수량 1 추가
+      setProducts(data.map(product => ({ ...product, selectedQty: 1 })))
     } catch (error: any) {
       console.error('상품 목록 조회 실패:', error)
       showAlert(error.message ?? '상품 목록을 불러오지 못했습니다.', 'error')
@@ -42,6 +47,14 @@ export default function HomePage() {
     )
   }
 
+  // 수량 변경
+  const handleQtyChange = (productNo: string, qty: number) => {
+    if (qty < 1) return
+    setProducts(prev =>
+      prev.map(p => p.productNo === productNo ? { ...p, selectedQty: qty } : p)
+    )
+  }
+
   // 장바구니 담기
   const handleAddToCart = async () => {
     if (!isLoggedIn || !member) {
@@ -55,9 +68,17 @@ export default function HomePage() {
     }
 
     try {
+      // 선택된 상품들의 수량 정보 포함
+      const items = products
+        .filter(p => selectedProducts.includes(p.productNo))
+        .map(p => ({
+          productNo: p.productNo,
+          qty: p.selectedQty,
+        }))
+
       await addToCartApi({
         memberNo: member.memberNo,
-        productNoList: selectedProducts,
+        items,
       })
       showAlert('장바구니에 담았습니다!', 'success')
       setSelectedProducts([])
@@ -111,7 +132,7 @@ export default function HomePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map(product => (
+            {products.map((product, index) => (
               <div
                 key={product.productNo}
                 className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition"
@@ -135,9 +156,41 @@ export default function HomePage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
                   {product.productName}
                 </h3>
-                <p className="text-xl font-bold text-blue-600">
+                <p className="text-xl font-bold text-blue-600 mb-3">
                   {product.price.toLocaleString()}원
                 </p>
+
+                {/* 수량 선택 */}
+                <div className="flex items-center gap-2">
+                  <label htmlFor={`qty-${product.productNo}`} className="text-sm font-medium text-gray-700">
+                    수량:
+                  </label>
+                  <div className="flex items-center border border-gray-300 rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => handleQtyChange(product.productNo, product.selectedQty - 1)}
+                      className="px-3 py-1 text-gray-600 hover:bg-gray-100 transition"
+                      disabled={product.selectedQty <= 1}
+                    >
+                      -
+                    </button>
+                    <input
+                      id={`qty-${product.productNo}`}
+                      type="number"
+                      min="1"
+                      value={product.selectedQty}
+                      onChange={(e) => handleQtyChange(product.productNo, parseInt(e.target.value) || 1)}
+                      className="w-16 px-2 py-1 text-center border-x border-gray-300 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleQtyChange(product.productNo, product.selectedQty + 1)}
+                      className="px-3 py-1 text-gray-600 hover:bg-gray-100 transition"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

@@ -21,4 +21,9 @@ public interface MemberService {
      * 회원가입
      */
     void registerMember(MemberRegisterRequest request);
+
+    /**
+     * 회원정보 조회
+     */
+    MemberResponse getMember(String memberNo);
 }

@@ -6,6 +6,7 @@ interface AuthState {
   isLoggedIn: boolean
   login: (member: Member) => void
   logout: () => void
+  updateMember: (member: Member) => void
   initialize: () => void
 }
 
@@ -49,6 +50,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
 
     set({ member: null, isLoggedIn: false })
+  },
+
+  updateMember: (member: Member) => {
+    // localStorage에 Member 전체 객체 업데이트
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('member', JSON.stringify(member))
+    }
+
+    set({ member, isLoggedIn: true })
   },
 
   initialize: () => {

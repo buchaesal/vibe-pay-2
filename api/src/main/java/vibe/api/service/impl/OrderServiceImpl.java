@@ -22,6 +22,7 @@ import vibe.api.repository.CartMapper;
 import vibe.api.repository.CartTrxMapper;
 import vibe.api.repository.OrderMapper;
 import vibe.api.repository.OrderTrxMapper;
+import vibe.api.service.CartService;
 import vibe.api.service.OrderService;
 import vibe.api.service.PaymentService;
 
@@ -46,8 +47,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final OrderTrxMapper orderTrxMapper;
     private final CartMapper cartMapper;
-    private final CartTrxMapper cartTrxMapper;
     private final PaymentService paymentService;
+    private final CartService cartService;
 
     /**
      * 주문서 데이터 조회
@@ -189,7 +190,7 @@ public class OrderServiceImpl implements OrderService {
             orderDetail.setProductNo(cart.getProductNo());
             orderDetail.setOrderType("ORDER");
             orderDetail.setOrderDatetime(orderDatetime);
-            orderDetail.setCompleteDatetime(null);
+            orderDetail.setCompleteDatetime(orderDatetime);
             orderDetail.setOrderQty(cart.getQty());
             orderDetail.setCancelQty(0);
 
@@ -214,13 +215,13 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 주문 완료 처리
+     * 장바구니 삭제는 별도 트랜잭션(CartService)으로 처리하며, 실패해도 주문 완료에 영향을 주지 않음
      */
     private void completeOrder(String orderNo, List<Long> cartIdList) {
-        orderTrxMapper.updateOrderDetailComplete(orderNo);
-        log.debug("ORDER_DETAIL 완료일시 업데이트: orderNo={}", orderNo);
-
-        cartTrxMapper.deleteCartByIds(cartIdList);
-        log.debug("장바구니 삭제 완료: count={}", cartIdList.size());
+        // 장바구니 삭제 - CartService의 별도 트랜잭션으로 처리
+        // 실패해도 주문 결과에 영향 없음 (내부에서 예외를 catch함)
+        cartService.deleteCartAfterOrder(cartIdList);
+        log.debug("주문 완료 처리 완료: orderNo={}", orderNo);
     }
 
     /**

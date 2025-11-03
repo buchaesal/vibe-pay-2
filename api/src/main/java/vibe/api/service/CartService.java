@@ -34,4 +34,10 @@ public interface CartService {
      * 장바구니 삭제
      */
     void deleteCart(DeleteCartRequest request);
+
+    /**
+     * 주문 완료 후 장바구니 삭제 (별도 트랜잭션)
+     * 실패해도 예외를 던지지 않음
+     */
+    void deleteCartAfterOrder(List<Long> cartIdList);
 }

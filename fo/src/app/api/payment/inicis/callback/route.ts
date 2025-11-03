@@ -36,7 +36,12 @@ export async function POST(request: NextRequest) {
       // 사용자가 결제창 닫기 버튼 클릭 (V801)
       if (resultCode === 'V801') {
         console.log('사용자가 결제창을 닫았습니다.')
-        return NextResponse.redirect(new URL('/orders/form', request.url))
+        // merchantData에서 cartIdList 추출하여 주문서로 리다이렉트
+        const cartIdList = merchantData?.toString() ?? ''
+        const redirectUrl = cartIdList
+          ? `/orders/form?cartIdList=${cartIdList}`
+          : '/orders/form'
+        return NextResponse.redirect(new URL(redirectUrl, request.url))
       }
 
       console.error('이니시스 인증 실패:', resultCode, resultMsg)

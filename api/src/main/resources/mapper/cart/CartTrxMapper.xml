@@ -15,11 +15,11 @@
         VALUES (
                #{memberNo}
              , #{productNo}
-             , 1
+             , #{qty}
              , NOW()
         )
         ON CONFLICT (MEMBER_NO, PRODUCT_NO)
-        DO UPDATE SET QTY = CART.QTY + 1
+        DO UPDATE SET QTY = CART.QTY + #{qty}
                     , UPDATED_AT = NOW()
     </insert>
 

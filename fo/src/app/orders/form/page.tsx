@@ -218,6 +218,10 @@ export default function OrderFormPage() {
       setInputValue('returnUrl', `${window.location.origin}/api/payment/inicis/callback`)
       setInputValue('closeUrl', '')
 
+      // cartIdList를 merchantData로 전달
+      const cartIdListParam = searchParams.get('cartIdList')
+      setInputValue('merchantData', cartIdListParam ?? '')
+
       // 이니시스 결제창 호출 (form 전달)
       window.INIStdPay.pay('inicisPayForm')
 
@@ -506,6 +510,7 @@ export default function OrderFormPage() {
         <input type="hidden" name="buyeremail" value="" />
         <input type="hidden" name="returnUrl" value="" />
         <input type="hidden" name="closeUrl" value="" />
+        <input type="hidden" name="merchantData" value="" />
         <input type="hidden" name="acceptmethod" value="HPP(1):below1000" />
         <input type="hidden" name="use_chkfake" value="" />
       </form>

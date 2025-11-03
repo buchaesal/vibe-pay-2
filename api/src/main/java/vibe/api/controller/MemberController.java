@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import vibe.api.common.dto.Response;
 import vibe.api.dto.request.MemberRegisterRequest;
+import vibe.api.dto.response.MemberResponse;
 import vibe.api.service.MemberService;
 
 /**
@@ -33,5 +34,17 @@ public class MemberController {
         memberService.registerMember(request);
 
         return new Response<>();
+    }
+
+    /**
+     * 회원정보 조회 API
+     */
+    @GetMapping("/{memberNo}")
+    public Response<MemberResponse> getMember(@PathVariable String memberNo) {
+        log.info("회원정보 조회 요청: memberNo={}", memberNo);
+
+        MemberResponse memberResponse = memberService.getMember(memberNo);
+
+        return new Response<>(memberResponse);
     }
 }

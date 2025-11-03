@@ -94,4 +94,28 @@ public class MemberServiceImpl implements MemberService {
 
         log.info("회원가입 성공: memberNo={}, loginId={}", memberNo, request.getLoginId());
     }
+
+    /**
+     * 회원정보 조회
+     */
+    @Override
+    public MemberResponse getMember(String memberNo) {
+        log.debug("회원정보 조회: memberNo={}", memberNo);
+
+        // 회원 조회
+        Member member = memberMapper.selectMemberByMemberNo(memberNo)
+            .orElseThrow(() -> new ApiException(ErrorCode.MEMBER_NOT_FOUND));
+
+        log.info("회원정보 조회 성공: memberNo={}, name={}", member.getMemberNo(), member.getName());
+
+        // 응답 DTO 생성
+        MemberResponse response = new MemberResponse();
+        response.setMemberNo(member.getMemberNo());
+        response.setName(member.getName());
+        response.setEmail(member.getEmail());
+        response.setPhone(member.getPhone());
+        response.setPoints(member.getPoints());
+
+        return response;
+    }
 }

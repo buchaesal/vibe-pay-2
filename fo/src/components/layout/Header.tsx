@@ -43,6 +43,9 @@ export default function Header() {
                   <span className="px-3 py-2 text-sm font-medium text-gray-700">
                     {member?.name}님
                   </span>
+                  <span className="px-3 py-2 text-sm font-medium text-blue-600">
+                    적립금: {member?.points?.toLocaleString() ?? 0}원
+                  </span>
                   <div className="w-px h-4 bg-gray-300 mx-1"></div>
                   <Link
                     href="/orders/history"

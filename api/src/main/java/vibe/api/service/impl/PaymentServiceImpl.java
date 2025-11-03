@@ -11,6 +11,7 @@ import vibe.api.dto.request.OrderInfo;
 import vibe.api.dto.request.PaymentInfo;
 import vibe.api.dto.response.PaymentParamsResponse;
 import vibe.api.entity.Payment;
+import vibe.api.payment.dto.ApprovalResult;
 import vibe.api.payment.strategy.PaymentMethodStrategy;
 import vibe.api.payment.strategy.PgStrategy;
 import vibe.api.pg.InicisClient;
@@ -63,6 +64,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * 결제 처리 (전략 패턴 + 망취소)
+     *
+     * ApprovalResult 기반으로 안전한 망취소 처리:
+     * 1. 각 전략의 approve() 호출 즉시 결과를 리스트에 추가
+     * 2. Payment INSERT 중 에러 발생해도 망취소 대상 확보
+     * 3. needsNetCancel 플래그로 망취소 필요 여부 판단
      */
     @Override
     @Transactional
@@ -72,27 +78,43 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("결제 처리 시작: orderNo={}, paymentCount={}", orderNo, payments.size());
 
-        List<Map<String, Object>> authResults = new ArrayList<>();
+        List<ApprovalResult> approvalResults = new ArrayList<>();
 
         try {
             for (PaymentInfo paymentInfo : payments) {
-                Map<String, Object> authResult = processIndividualPayment(orderRequest.getOrderInfo(), paymentInfo);
-                authResults.add(authResult);
+                // approvalResults 리스트를 전달하여 내부에서 즉시 추가
+                ApprovalResult result = processIndividualPayment(
+                    orderRequest.getOrderInfo(),
+                    paymentInfo,
+                    approvalResults
+                );
+
+                // 승인 실패한 경우 (PG 승인은 성공했으나 Payment 생성 실패)
+                if (!result.isSuccess()) {
+                    throw new ApiException(ErrorCode.APPROVE_FAIL);
+                }
             }
 
             log.info("결제 처리 완료: orderNo={}, totalCount={}", orderNo, payments.size());
 
         } catch (Exception e) {
             log.error("결제 처리 실패: orderNo={}", orderNo, e);
-            performNetCancellation(payments, authResults);
+            performNetCancellation(approvalResults);
             throw new ApiException(ErrorCode.APPROVE_FAIL);
         }
     }
 
     /**
      * 개별 결제 처리
+     *
+     * approvalResults 리스트를 전달받아 approve() 성공 즉시 추가
+     * → Payment INSERT 중 에러 발생해도 망취소 대상 확보
      */
-    private Map<String, Object> processIndividualPayment(OrderInfo orderInfo, PaymentInfo paymentInfo) {
+    private ApprovalResult processIndividualPayment(
+            OrderInfo orderInfo,
+            PaymentInfo paymentInfo,
+            List<ApprovalResult> approvalResults) {
+
         Long paymentNo = paymentMapper.selectNextPaymentNo();
         paymentInfo.setPaymentNo(paymentNo);
 
@@ -100,44 +122,58 @@ public class PaymentServiceImpl implements PaymentService {
             paymentNo, paymentInfo.getPgType(), paymentInfo.getMethod(), paymentInfo.getAmount());
 
         PaymentMethodStrategy strategy = getPaymentMethodStrategy(paymentInfo.getMethod());
-        Payment payment = strategy.approve(orderInfo, paymentInfo);
 
-        payment.setPaymentNo(paymentNo);
-        paymentTrxMapper.insertPayment(payment);
+        // 전략의 approve() 호출 (여기서 ApprovalResult 반환)
+        ApprovalResult approvalResult = strategy.approve(orderInfo, paymentInfo);
 
-        log.info("결제 승인 및 저장 성공: paymentNo={}, method={}, amount={}",
-            paymentNo, payment.getPaymentMethod(), payment.getPaymentAmount());
+        // approve() 성공 즉시 리스트에 추가! (이후 에러 발생해도 망취소 가능)
+        approvalResults.add(approvalResult);
+        log.debug("ApprovalResult 리스트에 추가 완료: needsNetCancel={}", approvalResult.isNeedsNetCancel());
 
-        return createAuthResultForNetCancel(orderInfo.getOrderNo(), paymentNo, paymentInfo);
-    }
+        // 승인 성공한 경우에만 Payment INSERT (여기서 에러 나도 위에서 이미 리스트 추가함)
+        if (approvalResult.isSuccess()) {
+            // 망취소 테스트
+//            if (true) {
+//                throw new IllegalArgumentException();
+//            }
+            Payment payment = approvalResult.getPayment();
+            payment.setPaymentNo(paymentNo);
+            paymentTrxMapper.insertPayment(payment);
 
-    /**
-     * 망취소용 authResult 생성
-     */
-    private Map<String, Object> createAuthResultForNetCancel(String orderNo, Long paymentNo, PaymentInfo paymentInfo) {
-        Map<String, Object> authResult = new HashMap<>(
-            paymentInfo.getAuthResult() != null ? paymentInfo.getAuthResult() : new HashMap<>()
-        );
-        authResult.put("orderNo", orderNo);
-        authResult.put("paymentNo", paymentNo);
-        authResult.put("pgType", paymentInfo.getPgType());
-        return authResult;
+            log.info("결제 승인 및 저장 성공: paymentNo={}, method={}, amount={}",
+                paymentNo, payment.getPaymentMethod(), payment.getPaymentAmount());
+        } else {
+            log.warn("결제 승인 실패 (PG 승인은 성공): paymentNo={}, needsNetCancel={}",
+                paymentNo, approvalResult.isNeedsNetCancel());
+        }
+
+        return approvalResult;
     }
 
     /**
      * 망취소 수행
+     *
+     * needsNetCancel = true인 것만 망취소 처리
+     * - 카드: true (PG 망취소 필요)
+     * - 적립금: false (DB 롤백으로 자동 복구)
      */
-    private void performNetCancellation(List<PaymentInfo> payments, List<Map<String, Object>> authResults) {
-        for (int i = 0; i < authResults.size(); i++) {
-            try {
-                PaymentInfo paymentInfo = payments.get(i);
-                PaymentMethodStrategy strategy = getPaymentMethodStrategy(paymentInfo.getMethod());
+    private void performNetCancellation(List<ApprovalResult> approvalResults) {
+        for (ApprovalResult result : approvalResults) {
+            if (!result.isNeedsNetCancel()) {
+                log.debug("망취소 불필요 (DB 롤백으로 자동 복구)");
+                continue;
+            }
 
-                log.warn("망취소 시도: method={}", paymentInfo.getMethod());
-                strategy.netCancel(authResults.get(i));
+            try {
+                Payment payment = result.getPayment();
+                String method = payment != null ? payment.getPaymentMethod() : "UNKNOWN";
+                PaymentMethodStrategy strategy = getPaymentMethodStrategy(method);
+
+                log.warn("망취소 시도: method={}", method);
+                strategy.netCancel(result);
 
             } catch (Exception netCancelEx) {
-                log.error("망취소 실패 (무시): method={}", payments.get(i).getMethod(), netCancelEx);
+                log.error("망취소 실패 (무시)", netCancelEx);
             }
         }
     }
