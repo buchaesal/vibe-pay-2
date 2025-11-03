@@ -112,6 +112,12 @@ export default function OrderFormPage() {
 
     // CASE 2: 카드 결제 (또는 복합 결제)
     if (cardAmount > 0) {
+      // 카드 결제는 100원 이상이어야 함
+      if (cardAmount < 100) {
+        showAlert('카드 결제는 100원 이상부터 가능합니다.', 'warning')
+        return
+      }
+
       // 랜덤으로 이니시스 / 토스 선택 (50:50)
       const pgType = Math.random() < 0.5 ? 'INICIS' : 'TOSS'
 
@@ -434,6 +440,14 @@ export default function OrderFormPage() {
               {(orderFormData.totalAmount - pointAmount).toLocaleString()}원
             </span>
           </div>
+          {/* 카드 결제 금액 validation 경고 */}
+          {orderFormData.totalAmount - pointAmount > 0 && orderFormData.totalAmount - pointAmount < 100 && (
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <p className="text-xs text-yellow-800">
+                ⚠️ 카드 결제는 100원 이상부터 가능합니다. 적립금을 조정하거나 상품을 추가해주세요.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
