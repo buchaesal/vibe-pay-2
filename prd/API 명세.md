@@ -555,7 +555,7 @@ PG 인증 응답은 `authResult` Map 형태로 전달하며,
     1. 주문 상세(ORDER_DETAIL)의 해당 주문 순번(order_seq)에 대해
     - 취소 구분(주문내역구분 = '취소')으로 **새로운 row를 INSERT**
     
-    (order_qty = 0, cancel_qty = 취소 수량, claim_no = 채번된 클레임 번호, parent_process_seq = 원 주문건 process_seq)
+    (order_qty = 취소 수량, cancel_qty = 0, claim_no = 채번된 클레임 번호, parent_process_seq = 원 주문건 process_seq)
     
     - 동시에 **원 주문 row(ORDER_DETAIL.process_seq = parent_process_seq)의 cancel_qty를 누적 UPDATE**
     
